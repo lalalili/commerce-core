@@ -5,9 +5,6 @@ namespace Lalalili\CommerceCore\Services;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
-use Lalalili\CommerceCore\Enums\InvoiceStatus;
-use Lalalili\CommerceCore\Enums\OrderStatus;
-use Lalalili\CommerceCore\Enums\PaymentStatus;
 use Lalalili\CommerceCore\Models\Order;
 use Lalalili\CommerceCore\Models\OrderDetail;
 use Lalalili\CommerceCore\Models\Product;
@@ -18,14 +15,13 @@ class OrderLifecycleService
     public function __construct(
         private readonly OrderNumberGenerator $numberGenerator,
         private readonly EntitlementService $entitlements,
-    ) {
-    }
+    ) {}
 
     /**
      * @param  list<array{product_id:string, qty?:int, title?:string, list_price?:int, sales_price?:int, product_type?:int|null, company_id?:int|null}>  $items
      * @param  array<string, mixed>  $attributes
      */
-    public function create(int $userId, array $items, array $attributes = []): Order
+    public function create(int $userId, array $items, array $attributes = []): Model
     {
         /** @var class-string<Order> $orderModel */
         $orderModel = config('commerce.models.order', Order::class);
@@ -34,7 +30,7 @@ class OrderLifecycleService
         /** @var class-string<Product> $productModel */
         $productModel = config('commerce.models.product', Product::class);
 
-        return DB::transaction(function () use ($userId, $items, $attributes, $orderModel, $detailModel, $productModel): Order {
+        return DB::transaction(function () use ($userId, $items, $attributes, $orderModel, $detailModel, $productModel): Model {
             $number = $attributes['number'] ?? $this->numberGenerator->generate();
             $normalizedItems = [];
             $totalListPrice = 0;
@@ -55,30 +51,30 @@ class OrderLifecycleService
                 $totalSalesPrice += $salesPrice * $quantity;
 
                 $normalizedItems[] = [
-                    'product'      => $product,
-                    'qty'          => $quantity,
-                    'title'        => (string) ($item['title'] ?? $product->title),
-                    'list_price'   => $listPrice,
-                    'sales_price'  => $salesPrice,
+                    'product' => $product,
+                    'qty' => $quantity,
+                    'title' => (string) ($item['title'] ?? $product->title),
+                    'list_price' => $listPrice,
+                    'sales_price' => $salesPrice,
                     'product_type' => $item['product_type'] ?? $product->type ?? null,
-                    'company_id'   => $item['company_id'] ?? $product->company_id ?? null,
+                    'company_id' => $item['company_id'] ?? $product->company_id ?? null,
                 ];
             }
 
-            /** @var Order $order */
+            /** @var Model $order */
             $order = $orderModel::query()->create(array_merge([
-                'number'                 => $number,
-                'user_id'                => $userId,
-                'total_discount_amt'     => max(0, $totalListPrice - $totalSalesPrice),
-                'total_sales_price'      => $totalSalesPrice,
-                'payment_type'           => 1,
-                'payment_status'         => PaymentStatus::Pending,
+                'number' => $number,
+                'user_id' => $userId,
+                'total_discount_amt' => max(0, $totalListPrice - $totalSalesPrice),
+                'total_sales_price' => $totalSalesPrice,
+                'payment_type' => 1,
+                'payment_status' => $this->status('payment.pending'),
                 'payment_status_message' => null,
-                'invoice_type'           => $attributes['invoice_type'] ?? 1,
-                'invoice_code'           => $attributes['invoice_code'] ?? null,
-                'notes'                  => $attributes['notes'] ?? null,
-                'status'                 => OrderStatus::Pending,
-                'created_by'             => $attributes['created_by'] ?? $userId,
+                'invoice_type' => $attributes['invoice_type'] ?? 1,
+                'invoice_code' => $attributes['invoice_code'] ?? null,
+                'notes' => $attributes['notes'] ?? null,
+                'status' => $this->status('order.pending'),
+                'created_by' => $attributes['created_by'] ?? $userId,
             ], $attributes));
 
             foreach ($normalizedItems as $item) {
@@ -86,17 +82,17 @@ class OrderLifecycleService
                 $product = $item['product'];
 
                 $detailModel::query()->create([
-                    'order_id'     => $order->getKey(),
+                    'order_id' => $order->getKey(),
                     'order_number' => $order->number,
-                    'product_id'   => $product->getKey(),
+                    'product_id' => $product->getKey(),
                     'product_type' => $item['product_type'],
-                    'company_id'   => $item['company_id'],
-                    'title'        => $item['title'],
-                    'qty'          => $item['qty'],
-                    'list_price'   => $item['list_price'],
-                    'sales_price'  => $item['sales_price'],
-                    'status'       => OrderStatus::Pending,
-                    'created_by'   => $attributes['created_by'] ?? $userId,
+                    'company_id' => $item['company_id'],
+                    'title' => $item['title'],
+                    'qty' => $item['qty'],
+                    'list_price' => $item['list_price'],
+                    'sales_price' => $item['sales_price'],
+                    'status' => $this->status('order.pending'),
+                    'created_by' => $attributes['created_by'] ?? $userId,
                 ]);
             }
 
@@ -109,36 +105,36 @@ class OrderLifecycleService
         string $paymentStatusMessage,
         CarbonInterface $paymentTime,
         ?int $updatedBy = null,
-    ): ?Order {
+    ): ?Model {
         /** @var class-string<Order> $orderModel */
         $orderModel = config('commerce.models.order', Order::class);
 
-        return DB::transaction(function () use ($orderNumber, $paymentStatusMessage, $paymentTime, $updatedBy, $orderModel): ?Order {
-            /** @var Order|null $order */
+        return DB::transaction(function () use ($orderNumber, $paymentStatusMessage, $paymentTime, $updatedBy, $orderModel): ?Model {
+            /** @var Model|null $order */
             $order = $orderModel::query()
-                ->with(['details.product'])
+                ->with([$this->detailsRelation().'.product'])
                 ->where('number', $orderNumber)
                 ->lockForUpdate()
                 ->first();
 
-            if (! $order instanceof Order) {
+            if (! $order instanceof Model) {
                 return null;
             }
 
-            if ($order->payment_status === PaymentStatus::Complete) {
+            if ($this->statusEquals($order->payment_status, 'payment.complete')) {
                 return $order;
             }
 
             $order->update([
-                'payment_status'         => PaymentStatus::Complete,
+                'payment_status' => $this->status('payment.complete'),
                 'payment_status_message' => $paymentStatusMessage,
-                'payment_time'           => $paymentTime,
-                'status'                 => OrderStatus::Complete,
-                'updated_by'             => $updatedBy ?? $order->user_id,
+                'payment_time' => $paymentTime,
+                'status' => $this->status('order.complete'),
+                'updated_by' => $updatedBy ?? $order->user_id,
             ]);
 
-            $order->details()->update([
-                'status'     => OrderStatus::Complete,
+            $order->{$this->detailsRelation()}()->update([
+                'status' => $this->status('order.complete'),
                 'updated_by' => $updatedBy ?? $order->user_id,
             ]);
 
@@ -148,44 +144,44 @@ class OrderLifecycleService
         });
     }
 
-    public function cancel(string $orderNumber, ?int $updatedBy = null): ?Order
+    public function cancel(string $orderNumber, ?int $updatedBy = null): ?Model
     {
         /** @var class-string<Order> $orderModel */
         $orderModel = config('commerce.models.order', Order::class);
 
-        return DB::transaction(function () use ($orderNumber, $updatedBy, $orderModel): ?Order {
-            /** @var Order|null $order */
+        return DB::transaction(function () use ($orderNumber, $updatedBy, $orderModel): ?Model {
+            /** @var Model|null $order */
             $order = $orderModel::query()
-                ->with(['details.product', 'invoices'])
+                ->with([$this->detailsRelation().'.product', $this->invoicesRelation()])
                 ->where('number', $orderNumber)
                 ->lockForUpdate()
                 ->first();
 
-            if (! $order instanceof Order) {
+            if (! $order instanceof Model) {
                 return null;
             }
 
-            if ($order->status !== OrderStatus::Cancelled) {
-                $paymentStatus = $order->payment_status === PaymentStatus::Complete
-                    ? PaymentStatus::Refunded
-                    : PaymentStatus::Cancelled;
+            if (! $this->statusEquals($order->status, 'order.cancelled')) {
+                $paymentStatus = $this->statusEquals($order->payment_status, 'payment.complete')
+                    ? $this->status('payment.refunded')
+                    : $this->status('payment.cancelled');
 
                 $order->update([
-                    'status'         => OrderStatus::Cancelled,
+                    'status' => $this->status('order.cancelled'),
                     'payment_status' => $paymentStatus,
-                    'updated_by'     => $updatedBy ?? $order->user_id,
-                    'cancel_at'      => now(),
+                    'updated_by' => $updatedBy ?? $order->user_id,
+                    'cancel_at' => now(),
                 ]);
 
-                $order->details()->update([
-                    'status'     => OrderStatus::Cancelled,
+                $order->{$this->detailsRelation()}()->update([
+                    'status' => $this->status('order.cancelled'),
                     'updated_by' => $updatedBy ?? $order->user_id,
                 ]);
 
-                $order->invoices()
-                    ->where('status', InvoiceStatus::Complete)
+                $order->{$this->invoicesRelation()}()
+                    ->where('status', $this->status('invoice.complete'))
                     ->update([
-                        'status'     => InvoiceStatus::Cancelled,
+                        'status' => $this->status('invoice.cancelled'),
                         'updated_by' => $updatedBy ?? $order->user_id,
                     ]);
             }
@@ -199,20 +195,57 @@ class OrderLifecycleService
     /**
      * @return array<int, list<array<string, mixed>>>
      */
-    public function detailsGroupedByTax(Order $order): array
+    public function detailsGroupedByTax(Model $order): array
     {
         $groups = [];
-        $order->loadMissing(['details.product']);
+        $detailsRelation = $this->detailsRelation();
+        $order->loadMissing([$detailsRelation.'.product']);
 
-        foreach ($order->details as $detail) {
-            if (! $detail instanceof OrderDetail || ! $detail->product instanceof Model) {
+        foreach ($order->getRelationValue($detailsRelation) ?? [] as $detail) {
+            if (! $detail instanceof Model || ! $detail->getRelationValue('product') instanceof Model) {
                 continue;
             }
 
-            $tax = (int) ($detail->product->tax ?? 1);
+            /** @var Model $product */
+            $product = $detail->getRelationValue('product');
+            $tax = (int) ($product->tax ?? 1);
             $groups[$tax][] = $detail->toArray();
         }
 
         return $groups;
+    }
+
+    private function detailsRelation(): string
+    {
+        $relation = config('commerce.relationships.order_details', 'details');
+
+        return is_string($relation) && $relation !== '' ? $relation : 'details';
+    }
+
+    private function invoicesRelation(): string
+    {
+        $relation = config('commerce.relationships.order_invoices', 'invoices');
+
+        return is_string($relation) && $relation !== '' ? $relation : 'invoices';
+    }
+
+    private function status(string $key): mixed
+    {
+        return config("commerce.statuses.{$key}");
+    }
+
+    private function statusEquals(mixed $actual, string $expectedKey): bool
+    {
+        $expected = $this->status($expectedKey);
+
+        if ($actual instanceof \BackedEnum) {
+            $actual = $actual->value;
+        }
+
+        if ($expected instanceof \BackedEnum) {
+            $expected = $expected->value;
+        }
+
+        return (string) $actual === (string) $expected;
     }
 }
