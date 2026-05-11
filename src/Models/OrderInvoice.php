@@ -19,8 +19,8 @@ class OrderInvoice extends Model
     public function casts(): array
     {
         return [
-            'type' => InvoiceType::class,
-            'status' => InvoiceStatus::class,
+            'type'      => InvoiceType::class,
+            'status'    => InvoiceStatus::class,
             'issued_at' => 'datetime',
         ];
     }

@@ -2,6 +2,7 @@
     "name": "lalalili/commerce-core",
     "description": "Reusable product, order, invoice, and entitlement core for Laravel commerce applications.",
     "type": "library",
+    "version": "0.1.2",
     "license": "MIT",
     "require": {
         "php": "^8.2",

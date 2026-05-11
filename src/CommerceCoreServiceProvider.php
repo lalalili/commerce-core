@@ -4,6 +4,7 @@ namespace Lalalili\CommerceCore;
 
 use Lalalili\CommerceCore\Services\EntitlementService;
 use Lalalili\CommerceCore\Services\OrderLifecycleService;
+use Lalalili\CommerceCore\Support\ModelAttributeMapper;
 use Lalalili\CommerceCore\Support\OrderNumberGenerator;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
@@ -22,6 +23,7 @@ class CommerceCoreServiceProvider extends PackageServiceProvider
 
     public function registeringPackage(): void
     {
+        $this->app->singleton(ModelAttributeMapper::class);
         $this->app->singleton(OrderNumberGenerator::class);
         $this->app->singleton(EntitlementService::class);
         $this->app->singleton(OrderLifecycleService::class);

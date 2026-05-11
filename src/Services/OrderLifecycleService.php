@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Lalalili\CommerceCore\Models\Order;
 use Lalalili\CommerceCore\Models\OrderDetail;
 use Lalalili\CommerceCore\Models\Product;
+use Lalalili\CommerceCore\Support\ModelAttributeMapper;
 use Lalalili\CommerceCore\Support\OrderNumberGenerator;
 
 class OrderLifecycleService
@@ -15,7 +16,9 @@ class OrderLifecycleService
     public function __construct(
         private readonly OrderNumberGenerator $numberGenerator,
         private readonly EntitlementService $entitlements,
-    ) {}
+        private readonly ModelAttributeMapper $attributes,
+    ) {
+    }
 
     /**
      * @param  list<array{product_id:string, qty?:int, title?:string, list_price?:int, sales_price?:int, product_type?:int|null, company_id?:int|null}>  $items
@@ -45,55 +48,60 @@ class OrderLifecycleService
                 }
 
                 $quantity = max(1, (int) ($item['qty'] ?? 1));
-                $listPrice = (int) ($item['list_price'] ?? data_get($product, 'list_price', 0));
-                $salesPrice = (int) ($item['sales_price'] ?? data_get($product, 'sales_price', $listPrice));
+                $listPrice = (int) ($item['list_price'] ?? $this->attributes->value($product, 'products', 'list_price', 0));
+                $salesPrice = (int) ($item['sales_price'] ?? $this->attributes->value($product, 'products', 'sales_price', $listPrice));
                 $totalListPrice += $listPrice * $quantity;
                 $totalSalesPrice += $salesPrice * $quantity;
 
                 $normalizedItems[] = [
-                    'product' => $product,
-                    'qty' => $quantity,
-                    'title' => (string) ($item['title'] ?? data_get($product, 'title')),
-                    'list_price' => $listPrice,
-                    'sales_price' => $salesPrice,
-                    'product_type' => $item['product_type'] ?? data_get($product, 'type'),
-                    'company_id' => $item['company_id'] ?? data_get($product, 'company_id'),
+                    'product'      => $product,
+                    'qty'          => $quantity,
+                    'title'        => (string) ($item['title'] ?? $this->attributes->value($product, 'products', 'title')),
+                    'list_price'   => $listPrice,
+                    'sales_price'  => $salesPrice,
+                    'product_type' => $item['product_type'] ?? $this->attributes->value($product, 'products', 'type'),
+                    'company_id'   => $item['company_id'] ?? $this->attributes->value($product, 'products', 'company_id'),
                 ];
             }
 
-            /** @var Model $order */
-            $order = $orderModel::query()->create(array_merge([
-                'number' => $number,
-                'user_id' => $userId,
-                'total_discount_amt' => max(0, $totalListPrice - $totalSalesPrice),
-                'total_sales_price' => $totalSalesPrice,
-                'payment_type' => 1,
-                'payment_status' => $this->status('payment.pending'),
+            $orderAttributes = $this->attributes->filterForModel($orderModel, $this->attributes->map('orders', array_merge([
+                'number'                 => $number,
+                'user_id'                => $userId,
+                'total_discount_amt'     => max(0, $totalListPrice - $totalSalesPrice),
+                'total_sales_price'      => $totalSalesPrice,
+                'payment_type'           => 1,
+                'payment_status'         => $this->status('payment.pending'),
                 'payment_status_message' => null,
-                'invoice_type' => $attributes['invoice_type'] ?? 1,
-                'invoice_code' => $attributes['invoice_code'] ?? null,
-                'notes' => $attributes['notes'] ?? null,
-                'status' => $this->status('order.pending'),
-                'created_by' => $attributes['created_by'] ?? $userId,
-            ], $attributes));
+                'invoice_type'           => $attributes['invoice_type'] ?? 1,
+                'invoice_code'           => $attributes['invoice_code'] ?? null,
+                'notes'                  => $attributes['notes'] ?? null,
+                'status'                 => $this->status('order.pending'),
+                'created_by'             => $attributes['created_by'] ?? $userId,
+            ], $attributes)));
+
+            /** @var Model $order */
+            $order = $orderModel::query()->create($orderAttributes);
 
             foreach ($normalizedItems as $item) {
                 /** @var Model $product */
                 $product = $item['product'];
 
-                $detailModel::query()->create([
-                    'order_id' => $order->getKey(),
-                    'order_number' => data_get($order, 'number'),
-                    'product_id' => $product->getKey(),
-                    'product_type' => $item['product_type'],
-                    'company_id' => $item['company_id'],
-                    'title' => $item['title'],
-                    'qty' => $item['qty'],
-                    'list_price' => $item['list_price'],
-                    'sales_price' => $item['sales_price'],
-                    'status' => $this->status('order.pending'),
-                    'created_by' => $attributes['created_by'] ?? $userId,
-                ]);
+                $detailAttributes = $this->attributes->filterForModel($detailModel, $this->attributes->map('order_details', [
+                    'order_id'       => $order->getKey(),
+                    'order_number'   => data_get($order, 'number'),
+                    'product_id'     => $product->getKey(),
+                    'product_number' => $this->attributes->value($product, 'products', 'number', $product->getKey()),
+                    'product_type'   => $item['product_type'],
+                    'company_id'     => $item['company_id'],
+                    'title'          => $item['title'],
+                    'qty'            => $item['qty'],
+                    'list_price'     => $item['list_price'],
+                    'sales_price'    => $item['sales_price'],
+                    'status'         => $this->status('order.pending'),
+                    'created_by'     => $attributes['created_by'] ?? $userId,
+                ]));
+
+                $detailModel::query()->create($detailAttributes);
             }
 
             return $order->refresh();
@@ -125,18 +133,21 @@ class OrderLifecycleService
                 return $order;
             }
 
-            $order->update([
-                'payment_status' => $this->status('payment.complete'),
-                'payment_status_message' => $paymentStatusMessage,
-                'payment_time' => $paymentTime,
-                'status' => $this->status('order.complete'),
-                'updated_by' => $updatedBy ?? data_get($order, 'user_id'),
-            ]);
+            $paidStatus = $this->status('order.paid', $this->status('order.complete'));
 
-            $order->{$this->detailsRelation()}()->update([
-                'status' => $this->status('order.complete'),
+            $order->update($this->attributes->filterForModel($orderModel, $this->attributes->map('orders', [
+                'payment_status'         => $this->status('payment.complete'),
+                'payment_status_message' => $paymentStatusMessage,
+                'payment_time'           => $paymentTime,
+                'payment_reconciled_at'  => now(),
+                'status'                 => $paidStatus,
+                'updated_by'             => $updatedBy ?? data_get($order, 'user_id'),
+            ])));
+
+            $order->{$this->detailsRelation()}()->update($this->attributes->filterForModel($this->detailModel(), $this->attributes->map('order_details', [
+                'status'     => $paidStatus,
                 'updated_by' => $updatedBy ?? data_get($order, 'user_id'),
-            ]);
+            ])));
 
             $this->entitlements->grantOrder($order->refresh(), $updatedBy);
 
@@ -166,24 +177,24 @@ class OrderLifecycleService
                     ? $this->status('payment.refunded')
                     : $this->status('payment.cancelled');
 
-                $order->update([
-                    'status' => $this->status('order.cancelled'),
+                $order->update($this->attributes->filterForModel($orderModel, $this->attributes->map('orders', [
+                    'status'         => $this->status('order.cancelled'),
                     'payment_status' => $paymentStatus,
-                    'updated_by' => $updatedBy ?? data_get($order, 'user_id'),
-                    'cancel_at' => now(),
-                ]);
+                    'updated_by'     => $updatedBy ?? data_get($order, 'user_id'),
+                    'cancel_at'      => now(),
+                ])));
 
-                $order->{$this->detailsRelation()}()->update([
-                    'status' => $this->status('order.cancelled'),
+                $order->{$this->detailsRelation()}()->update($this->attributes->filterForModel($this->detailModel(), $this->attributes->map('order_details', [
+                    'status'     => $this->status('order.cancelled'),
                     'updated_by' => $updatedBy ?? data_get($order, 'user_id'),
-                ]);
+                ])));
 
                 $order->{$this->invoicesRelation()}()
                     ->where('status', $this->status('invoice.complete'))
-                    ->update([
-                        'status' => $this->status('invoice.cancelled'),
+                    ->update($this->attributes->filterForModel($this->invoiceModel(), $this->attributes->map('order_invoices', [
+                        'status'     => $this->status('invoice.cancelled'),
                         'updated_by' => $updatedBy ?? data_get($order, 'user_id'),
-                    ]);
+                    ])));
             }
 
             $this->entitlements->revokeOrder($order);
@@ -208,7 +219,7 @@ class OrderLifecycleService
 
             /** @var Model $product */
             $product = $detail->getRelationValue('product');
-            $tax = (int) data_get($product, 'tax', 1);
+            $tax = (int) $this->attributes->value($product, 'products', 'tax', 1);
             $groups[$tax][] = $detail->toArray();
         }
 
@@ -229,9 +240,29 @@ class OrderLifecycleService
         return is_string($relation) && $relation !== '' ? $relation : 'invoices';
     }
 
-    private function status(string $key): mixed
+    /**
+     * @return class-string<Model>
+     */
+    private function detailModel(): string
     {
-        return config("commerce.statuses.{$key}");
+        $model = config('commerce.models.order_detail', OrderDetail::class);
+
+        return is_string($model) && is_a($model, Model::class, true) ? $model : OrderDetail::class;
+    }
+
+    /**
+     * @return class-string<Model>
+     */
+    private function invoiceModel(): string
+    {
+        $model = config('commerce.models.order_invoice', \Lalalili\CommerceCore\Models\OrderInvoice::class);
+
+        return is_string($model) && is_a($model, Model::class, true) ? $model : \Lalalili\CommerceCore\Models\OrderInvoice::class;
+    }
+
+    private function status(string $key, mixed $default = null): mixed
+    {
+        return config("commerce.statuses.{$key}", $default);
     }
 
     private function statusEquals(mixed $actual, string $expectedKey): bool

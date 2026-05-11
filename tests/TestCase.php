@@ -37,9 +37,9 @@ abstract class TestCase extends OrchestraTestCase
         config()->set('app.key', 'base64:'.base64_encode(str_repeat('a', 32)));
         config()->set('database.default', 'testing');
         config()->set('database.connections.testing', [
-            'driver' => 'sqlite',
+            'driver'   => 'sqlite',
             'database' => ':memory:',
-            'prefix' => '',
+            'prefix'   => '',
         ]);
     }
 }

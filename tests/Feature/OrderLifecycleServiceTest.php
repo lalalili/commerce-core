@@ -11,11 +11,11 @@ use Lalalili\CommerceCore\Services\OrderLifecycleService;
 it('creates orders from products and groups details by tax', function (): void {
     $service = app(OrderLifecycleService::class);
     $product = Product::query()->create([
-        'title' => 'Cloudflare Stream course',
-        'type' => 1,
-        'list_price' => 1200,
+        'title'       => 'Cloudflare Stream course',
+        'type'        => 1,
+        'list_price'  => 1200,
         'sales_price' => 900,
-        'tax' => 1,
+        'tax'         => 1,
     ]);
 
     $order = $service->create(1, [
@@ -34,11 +34,11 @@ it('creates orders from products and groups details by tax', function (): void {
 it('marks paid orders idempotently and grants entitlements', function (): void {
     $service = app(OrderLifecycleService::class);
     $product = Product::query()->create([
-        'title' => 'Paid course',
-        'type' => 1,
-        'list_price' => 1000,
+        'title'       => 'Paid course',
+        'type'        => 1,
+        'list_price'  => 1000,
         'sales_price' => 1000,
-        'tax' => 1,
+        'tax'         => 1,
     ]);
     $order = $service->create(1, [['product_id' => $product->id]], ['number' => '260510PAID']);
 
@@ -53,23 +53,23 @@ it('marks paid orders idempotently and grants entitlements', function (): void {
 it('cancels paid orders as refunded and revokes entitlements', function (): void {
     $service = app(OrderLifecycleService::class);
     $product = Product::query()->create([
-        'title' => 'Refunded course',
-        'type' => 1,
-        'list_price' => 1000,
+        'title'       => 'Refunded course',
+        'type'        => 1,
+        'list_price'  => 1000,
         'sales_price' => 1000,
-        'tax' => 1,
+        'tax'         => 1,
     ]);
     $order = $service->create(1, [['product_id' => $product->id]], ['number' => '260510RFND']);
     $service->markPaid($order->number, 'Succeeded', now());
 
     OrderInvoice::query()->create([
-        'user_id' => 1,
-        'order_id' => $order->id,
-        'order_number' => $order->number,
+        'user_id'           => 1,
+        'order_id'          => $order->id,
+        'order_number'      => $order->number,
         'total_sales_price' => 1000,
-        'type' => 1,
-        'number' => 'AB12345678',
-        'status' => InvoiceStatus::Complete,
+        'type'              => 1,
+        'number'            => 'AB12345678',
+        'status'            => InvoiceStatus::Complete,
     ]);
 
     $cancelled = $service->cancel($order->number);
