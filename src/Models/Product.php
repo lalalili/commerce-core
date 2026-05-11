@@ -23,8 +23,7 @@ class Product extends Model
      */
     public function detail(): HasOne
     {
-        /** @var HasOne<ProductDetail, $this> $relation */
-        $relation = $this->hasOne(config('commerce.models.product_detail', ProductDetail::class));
+        $relation = $this->hasOne($this->productDetailModel());
 
         return $relation;
     }
@@ -41,5 +40,15 @@ class Product extends Model
         $relation = $this->belongsToMany($userModel, config('commerce.tables.product_user', 'product_user'));
 
         return $relation;
+    }
+
+    /**
+     * @return class-string<ProductDetail>
+     */
+    private function productDetailModel(): string
+    {
+        $model = config('commerce.models.product_detail', ProductDetail::class);
+
+        return is_string($model) && is_a($model, ProductDetail::class, true) ? $model : ProductDetail::class;
     }
 }

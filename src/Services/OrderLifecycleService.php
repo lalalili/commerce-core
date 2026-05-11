@@ -45,19 +45,19 @@ class OrderLifecycleService
                 }
 
                 $quantity = max(1, (int) ($item['qty'] ?? 1));
-                $listPrice = (int) ($item['list_price'] ?? $product->list_price ?? 0);
-                $salesPrice = (int) ($item['sales_price'] ?? $product->sales_price ?? $listPrice);
+                $listPrice = (int) ($item['list_price'] ?? data_get($product, 'list_price', 0));
+                $salesPrice = (int) ($item['sales_price'] ?? data_get($product, 'sales_price', $listPrice));
                 $totalListPrice += $listPrice * $quantity;
                 $totalSalesPrice += $salesPrice * $quantity;
 
                 $normalizedItems[] = [
                     'product' => $product,
                     'qty' => $quantity,
-                    'title' => (string) ($item['title'] ?? $product->title),
+                    'title' => (string) ($item['title'] ?? data_get($product, 'title')),
                     'list_price' => $listPrice,
                     'sales_price' => $salesPrice,
-                    'product_type' => $item['product_type'] ?? $product->type ?? null,
-                    'company_id' => $item['company_id'] ?? $product->company_id ?? null,
+                    'product_type' => $item['product_type'] ?? data_get($product, 'type'),
+                    'company_id' => $item['company_id'] ?? data_get($product, 'company_id'),
                 ];
             }
 
@@ -83,7 +83,7 @@ class OrderLifecycleService
 
                 $detailModel::query()->create([
                     'order_id' => $order->getKey(),
-                    'order_number' => $order->number,
+                    'order_number' => data_get($order, 'number'),
                     'product_id' => $product->getKey(),
                     'product_type' => $item['product_type'],
                     'company_id' => $item['company_id'],
@@ -121,7 +121,7 @@ class OrderLifecycleService
                 return null;
             }
 
-            if ($this->statusEquals($order->payment_status, 'payment.complete')) {
+            if ($this->statusEquals(data_get($order, 'payment_status'), 'payment.complete')) {
                 return $order;
             }
 
@@ -130,12 +130,12 @@ class OrderLifecycleService
                 'payment_status_message' => $paymentStatusMessage,
                 'payment_time' => $paymentTime,
                 'status' => $this->status('order.complete'),
-                'updated_by' => $updatedBy ?? $order->user_id,
+                'updated_by' => $updatedBy ?? data_get($order, 'user_id'),
             ]);
 
             $order->{$this->detailsRelation()}()->update([
                 'status' => $this->status('order.complete'),
-                'updated_by' => $updatedBy ?? $order->user_id,
+                'updated_by' => $updatedBy ?? data_get($order, 'user_id'),
             ]);
 
             $this->entitlements->grantOrder($order->refresh(), $updatedBy);
@@ -161,28 +161,28 @@ class OrderLifecycleService
                 return null;
             }
 
-            if (! $this->statusEquals($order->status, 'order.cancelled')) {
-                $paymentStatus = $this->statusEquals($order->payment_status, 'payment.complete')
+            if (! $this->statusEquals(data_get($order, 'status'), 'order.cancelled')) {
+                $paymentStatus = $this->statusEquals(data_get($order, 'payment_status'), 'payment.complete')
                     ? $this->status('payment.refunded')
                     : $this->status('payment.cancelled');
 
                 $order->update([
                     'status' => $this->status('order.cancelled'),
                     'payment_status' => $paymentStatus,
-                    'updated_by' => $updatedBy ?? $order->user_id,
+                    'updated_by' => $updatedBy ?? data_get($order, 'user_id'),
                     'cancel_at' => now(),
                 ]);
 
                 $order->{$this->detailsRelation()}()->update([
                     'status' => $this->status('order.cancelled'),
-                    'updated_by' => $updatedBy ?? $order->user_id,
+                    'updated_by' => $updatedBy ?? data_get($order, 'user_id'),
                 ]);
 
                 $order->{$this->invoicesRelation()}()
                     ->where('status', $this->status('invoice.complete'))
                     ->update([
                         'status' => $this->status('invoice.cancelled'),
-                        'updated_by' => $updatedBy ?? $order->user_id,
+                        'updated_by' => $updatedBy ?? data_get($order, 'user_id'),
                     ]);
             }
 
@@ -208,7 +208,7 @@ class OrderLifecycleService
 
             /** @var Model $product */
             $product = $detail->getRelationValue('product');
-            $tax = (int) ($product->tax ?? 1);
+            $tax = (int) data_get($product, 'tax', 1);
             $groups[$tax][] = $detail->toArray();
         }
 

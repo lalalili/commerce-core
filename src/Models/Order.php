@@ -34,8 +34,7 @@ class Order extends Model
      */
     public function details(): HasMany
     {
-        /** @var HasMany<OrderDetail, $this> $relation */
-        $relation = $this->hasMany(config('commerce.models.order_detail', OrderDetail::class));
+        $relation = $this->hasMany($this->orderDetailModel());
 
         return $relation;
     }
@@ -45,8 +44,7 @@ class Order extends Model
      */
     public function invoices(): HasMany
     {
-        /** @var HasMany<OrderInvoice, $this> $relation */
-        $relation = $this->hasMany(config('commerce.models.order_invoice', OrderInvoice::class));
+        $relation = $this->hasMany($this->orderInvoiceModel());
 
         return $relation;
     }
@@ -56,9 +54,38 @@ class Order extends Model
      */
     public function paymentLogs(): HasMany
     {
-        /** @var HasMany<PaymentLog, $this> $relation */
-        $relation = $this->hasMany(config('commerce.models.payment_log', PaymentLog::class), 'order_number', 'number');
+        $relation = $this->hasMany($this->paymentLogModel(), 'order_number', 'number');
 
         return $relation;
+    }
+
+    /**
+     * @return class-string<OrderDetail>
+     */
+    private function orderDetailModel(): string
+    {
+        $model = config('commerce.models.order_detail', OrderDetail::class);
+
+        return is_string($model) && is_a($model, OrderDetail::class, true) ? $model : OrderDetail::class;
+    }
+
+    /**
+     * @return class-string<OrderInvoice>
+     */
+    private function orderInvoiceModel(): string
+    {
+        $model = config('commerce.models.order_invoice', OrderInvoice::class);
+
+        return is_string($model) && is_a($model, OrderInvoice::class, true) ? $model : OrderInvoice::class;
+    }
+
+    /**
+     * @return class-string<PaymentLog>
+     */
+    private function paymentLogModel(): string
+    {
+        $model = config('commerce.models.payment_log', PaymentLog::class);
+
+        return is_string($model) && is_a($model, PaymentLog::class, true) ? $model : PaymentLog::class;
     }
 }

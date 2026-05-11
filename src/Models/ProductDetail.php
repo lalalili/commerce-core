@@ -19,9 +19,18 @@ class ProductDetail extends Model
      */
     public function product(): BelongsTo
     {
-        /** @var BelongsTo<Product, $this> $relation */
-        $relation = $this->belongsTo(config('commerce.models.product', Product::class));
+        $relation = $this->belongsTo($this->productModel());
 
         return $relation;
+    }
+
+    /**
+     * @return class-string<Product>
+     */
+    private function productModel(): string
+    {
+        $model = config('commerce.models.product', Product::class);
+
+        return is_string($model) && is_a($model, Product::class, true) ? $model : Product::class;
     }
 }

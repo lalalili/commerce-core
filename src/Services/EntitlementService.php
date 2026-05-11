@@ -25,12 +25,12 @@ class EntitlementService
             $productUserModel::query()->firstOrCreate(
                 [
                     'product_id' => $product->getKey(),
-                    'user_id' => $order->user_id,
+                    'user_id' => data_get($order, 'user_id'),
                 ],
                 [
-                    'order_number' => $order->number,
-                    'product_type' => $detail->product_type,
-                    'created_by' => $createdBy ?? $order->user_id,
+                    'order_number' => data_get($order, 'number'),
+                    'product_type' => data_get($detail, 'product_type'),
+                    'created_by' => $createdBy ?? data_get($order, 'user_id'),
                     'created_at' => $now,
                 ],
             );
@@ -53,7 +53,7 @@ class EntitlementService
 
         $productUserModel::query()
             ->whereIn('product_id', $productIds)
-            ->where('user_id', $order->user_id)
+            ->where('user_id', data_get($order, 'user_id'))
             ->delete();
     }
 

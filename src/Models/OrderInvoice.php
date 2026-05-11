@@ -30,9 +30,18 @@ class OrderInvoice extends Model
      */
     public function order(): BelongsTo
     {
-        /** @var BelongsTo<Order, $this> $relation */
-        $relation = $this->belongsTo(config('commerce.models.order', Order::class));
+        $relation = $this->belongsTo($this->orderModel());
 
         return $relation;
+    }
+
+    /**
+     * @return class-string<Order>
+     */
+    private function orderModel(): string
+    {
+        $model = config('commerce.models.order', Order::class);
+
+        return is_string($model) && is_a($model, Order::class, true) ? $model : Order::class;
     }
 }
