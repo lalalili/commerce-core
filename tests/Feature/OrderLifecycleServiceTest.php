@@ -3,6 +3,7 @@
 use Lalalili\CommerceCore\Enums\InvoiceStatus;
 use Lalalili\CommerceCore\Enums\OrderStatus;
 use Lalalili\CommerceCore\Enums\PaymentStatus;
+use Lalalili\CommerceCore\Models\Order;
 use Lalalili\CommerceCore\Models\OrderInvoice;
 use Lalalili\CommerceCore\Models\Product;
 use Lalalili\CommerceCore\Models\ProductUser;
@@ -29,6 +30,15 @@ it('creates orders from products and groups details by tax', function (): void {
         ->and($order->total_discount_amt)->toBe(600)
         ->and($order->details)->toHaveCount(1)
         ->and($service->detailsGroupedByTax($order))->toHaveKey(1);
+});
+
+it('rejects creating orders without items', function (): void {
+    $service = app(OrderLifecycleService::class);
+
+    expect(fn () => $service->create(1, [], ['number' => '260510NONE']))
+        ->toThrow(InvalidArgumentException::class, 'Order items must not be empty.');
+
+    expect(Order::query()->where('number', '260510NONE')->exists())->toBeFalse();
 });
 
 it('marks paid orders idempotently and grants entitlements', function (): void {

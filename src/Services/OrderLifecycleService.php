@@ -26,6 +26,10 @@ class OrderLifecycleService
      */
     public function create(int $userId, array $items, array $attributes = []): Model
     {
+        if ($items === []) {
+            throw new \InvalidArgumentException('Order items must not be empty.');
+        }
+
         /** @var class-string<Order> $orderModel */
         $orderModel = config('commerce.models.order', Order::class);
         /** @var class-string<OrderDetail> $detailModel */
@@ -102,6 +106,10 @@ class OrderLifecycleService
                 ]));
 
                 $detailModel::query()->create($detailAttributes);
+            }
+
+            if ($order->{$this->detailsRelation()}()->count() !== count($normalizedItems)) {
+                throw new \RuntimeException('Order detail count does not match normalized order items.');
             }
 
             return $order->refresh();
