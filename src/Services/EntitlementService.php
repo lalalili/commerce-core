@@ -8,9 +8,7 @@ use Lalalili\CommerceCore\Support\ModelAttributeMapper;
 
 class EntitlementService
 {
-    public function __construct(private readonly ModelAttributeMapper $attributes)
-    {
-    }
+    public function __construct(private readonly ModelAttributeMapper $attributes) {}
 
     public function grantOrder(Model $order, ?int $createdBy = null): void
     {
@@ -32,15 +30,15 @@ class EntitlementService
             /** @var Model $product */
             $product = $detail->getRelationValue('product');
             $lookup = $this->attributes->filterForModel($productUserModel, $this->attributes->map('product_user', [
-                'product_id'     => $product->getKey(),
+                'product_id' => $product->getKey(),
                 'product_number' => $this->attributes->value($product, 'products', 'number', $product->getKey()),
-                'user_id'        => data_get($order, 'user_id'),
+                'user_id' => data_get($order, 'user_id'),
             ]));
             $values = $this->attributes->filterForModel($productUserModel, $this->attributes->map('product_user', [
                 'order_number' => data_get($order, 'number'),
                 'product_type' => data_get($detail, $this->attributes->column('order_details', 'product_type', 'product_type') ?? 'product_type'),
-                'created_by'   => $createdBy ?? data_get($order, 'user_id'),
-                'created_at'   => $now,
+                'created_by' => $createdBy ?? data_get($order, 'user_id'),
+                'created_at' => $now,
             ]));
 
             if ($lookup === []) {
@@ -71,7 +69,13 @@ class EntitlementService
         $detailsRelation = $this->detailsRelation();
         $order->loadMissing(["{$detailsRelation}.product"]);
 
-        $productIds = collect($order->getRelationValue($detailsRelation) ?? [])
+        $details = $order->getRelationValue($detailsRelation);
+
+        if (! is_iterable($details)) {
+            return;
+        }
+
+        $productIds = collect($details)
             ->filter(fn (mixed $detail): bool => $detail instanceof Model)
             ->map(function (Model $detail) use ($productUserKeyColumn): mixed {
                 $product = $detail->getRelationValue('product');
