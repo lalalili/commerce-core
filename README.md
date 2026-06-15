@@ -14,6 +14,8 @@ Reusable product, order, invoice, payment log, and entitlement core for Laravel 
 
 ## Installation
 
+If the host application uses Laravel Sail, prefix Composer and Artisan commands with `./vendor/bin/sail`.
+
 ```bash
 composer require lalalili/commerce-core
 php artisan vendor:publish --tag=commerce-core-config
@@ -43,6 +45,13 @@ Publish `config/commerce.php` to customize:
 - order, payment, and invoice status mappings
 
 This package is designed to work with existing host schemas by mapping logical commerce fields to host column names.
+
+Example host mappings:
+
+- `aitehub` keeps entitlements enabled and maps commerce product columns such as `number` to `prod_no`, with course packages depending on `commerce-core` through `course-commerce` and `payment-ecpay`.
+- `cptw` maps legacy tables such as `order`, `order_detail`, `payment_log`, and `product`, disables `commerce.entitlements.enabled`, and keeps EPUB access grants in its host app services.
+
+Host applications should prefer overriding `config/commerce.php` instead of subclassing package models or services for schema compatibility.
 
 ## Usage
 
