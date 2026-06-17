@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Lalalili\CommerceCore\CommerceCoreServiceProvider;
 use Orchestra\Testbench\TestCase as OrchestraTestCase;
+use RuntimeException;
 
 abstract class TestCase extends OrchestraTestCase
 {
@@ -32,6 +33,12 @@ abstract class TestCase extends OrchestraTestCase
         DB::statement('PRAGMA foreign_keys = ON');
     }
 
+    protected function beforeRefreshingDatabase(): void
+    {
+        $this->guardAgainstCachedConfigDuringTests();
+        $this->ensureSafeTestingDatabase();
+    }
+
     protected function getEnvironmentSetUp($app): void
     {
         config()->set('app.key', 'base64:'.base64_encode(str_repeat('a', 32)));
@@ -41,5 +48,45 @@ abstract class TestCase extends OrchestraTestCase
             'database' => ':memory:',
             'prefix'   => '',
         ]);
+    }
+
+    protected function ensureSafeTestingDatabase(): void
+    {
+        $defaultConnection = (string) config('database.default');
+        $testingDatabase = (string) config('database.connections.testing.database');
+
+        if ($defaultConnection === 'testing' && $testingDatabase === ':memory:') {
+            return;
+        }
+
+        throw new RuntimeException(
+            "Unsafe package test database detected. Connection [{$defaultConnection}] with testing database [{$testingDatabase}] is not allowed."
+        );
+    }
+
+    protected function guardAgainstCachedConfigDuringTests(): void
+    {
+        foreach ($this->candidateConfigCachePaths() as $cachedConfigPath) {
+            if (! is_file($cachedConfigPath)) {
+                continue;
+            }
+
+            throw new RuntimeException(
+                "Detected cached config at [{$cachedConfigPath}]. Run ./vendor/bin/sail artisan optimize:clear before running tests."
+            );
+        }
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function candidateConfigCachePaths(): array
+    {
+        $workingDirectory = getcwd() ?: dirname(__DIR__, 3);
+
+        return [
+            $workingDirectory.'/bootstrap/cache/config.php',
+            $workingDirectory.'/bootstrap/cache/config.testing.php',
+        ];
     }
 }
