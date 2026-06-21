@@ -41,6 +41,52 @@ it('rejects creating orders without items', function (): void {
     expect(Order::query()->where('number', '260510NONE')->exists())->toBeFalse();
 });
 
+it('rejects creating orders when a product cannot be normalized', function (): void {
+    $service = app(OrderLifecycleService::class);
+
+    expect(fn () => $service->create(1, [
+        ['product_id' => 'missing-product'],
+    ], ['number' => '260510MISS']))
+        ->toThrow(InvalidArgumentException::class, 'Product [missing-product] does not exist.');
+
+    expect(Order::query()->where('number', '260510MISS')->exists())->toBeFalse();
+});
+
+it('uses explicit checkout item attributes when creating order details', function (): void {
+    $service = app(OrderLifecycleService::class);
+    $product = Product::query()->create([
+        'title' => 'Original product title',
+        'type' => 1,
+        'list_price' => 1200,
+        'sales_price' => 900,
+        'tax' => 1,
+    ]);
+
+    $order = $service->create(1, [
+        [
+            'product_id' => $product->id,
+            'qty' => 1,
+            'title' => 'Checkout title',
+            'list_price' => 1500,
+            'sales_price' => 1000,
+            'product_type' => 9,
+            'company_id' => 20,
+        ],
+    ], [
+        'number' => '260510ITEM',
+    ]);
+
+    $detail = $order->details()->first();
+
+    expect($order->total_sales_price)->toBe(1000)
+        ->and($order->total_discount_amt)->toBe(500)
+        ->and($detail?->title)->toBe('Checkout title')
+        ->and($detail?->list_price)->toBe(1500)
+        ->and($detail?->sales_price)->toBe(1000)
+        ->and($detail?->product_type)->toBe(9)
+        ->and($detail?->company_id)->toBe(20);
+});
+
 it('marks paid orders idempotently and grants entitlements', function (): void {
     $service = app(OrderLifecycleService::class);
     $product = Product::query()->create([
