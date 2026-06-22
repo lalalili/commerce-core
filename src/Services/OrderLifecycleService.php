@@ -5,7 +5,11 @@ namespace Lalalili\CommerceCore\Services;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Lalalili\CommerceCore\DTOs\OrderItemData;
+use Lalalili\CommerceCore\Events\OrderCancelled;
+use Lalalili\CommerceCore\Events\OrderCreated;
+use Lalalili\CommerceCore\Events\OrderPaid;
 use Lalalili\CommerceCore\Models\Order;
 use Lalalili\CommerceCore\Models\OrderDetail;
 use Lalalili\CommerceCore\Models\OrderInvoice;
@@ -40,7 +44,7 @@ class OrderLifecycleService
         /** @var class-string<Product> $productModel */
         $productModel = config('commerce.models.product', Product::class);
 
-        return DB::transaction(function () use ($userId, $items, $attributes, $orderModel, $detailModel, $productModel): Model {
+        $order = DB::transaction(function () use ($userId, $items, $attributes, $orderModel, $detailModel, $productModel): Model {
             $number = $attributes['number'] ?? $this->numberGenerator->generate();
             $normalizedItems = $this->resolveItemNormalizer()->normalize($items, $productModel);
             $totalListPrice = array_sum(array_map(
@@ -95,6 +99,10 @@ class OrderLifecycleService
 
             return $order->refresh();
         });
+
+        Event::dispatch(new OrderCreated($order));
+
+        return $order;
     }
 
     public function markPaid(
@@ -106,7 +114,9 @@ class OrderLifecycleService
         /** @var class-string<Order> $orderModel */
         $orderModel = config('commerce.models.order', Order::class);
 
-        return DB::transaction(function () use ($orderNumber, $paymentStatusMessage, $paymentTime, $updatedBy, $orderModel): ?Model {
+        $transitioned = false;
+
+        $order = DB::transaction(function () use ($orderNumber, $paymentStatusMessage, $paymentTime, $updatedBy, $orderModel, &$transitioned): ?Model {
             /** @var Model|null $order */
             $order = $orderModel::query()
                 ->with([$this->detailsRelation().'.product'])
@@ -140,8 +150,16 @@ class OrderLifecycleService
 
             $this->entitlements->grantOrder($order->refresh(), $updatedBy);
 
+            $transitioned = true;
+
             return $order->refresh();
         });
+
+        if ($order instanceof Model && $transitioned) {
+            Event::dispatch(new OrderPaid($order, $paymentStatusMessage, $paymentTime, $updatedBy));
+        }
+
+        return $order;
     }
 
     public function cancel(string $orderNumber, ?int $updatedBy = null): ?Model
@@ -149,7 +167,9 @@ class OrderLifecycleService
         /** @var class-string<Order> $orderModel */
         $orderModel = config('commerce.models.order', Order::class);
 
-        return DB::transaction(function () use ($orderNumber, $updatedBy, $orderModel): ?Model {
+        $transitioned = false;
+
+        $order = DB::transaction(function () use ($orderNumber, $updatedBy, $orderModel, &$transitioned): ?Model {
             /** @var Model|null $order */
             $order = $orderModel::query()
                 ->with([$this->detailsRelation().'.product', $this->invoicesRelation()])
@@ -184,12 +204,19 @@ class OrderLifecycleService
                         'status' => $this->status('invoice.cancelled'),
                         'updated_by' => $updatedBy ?? data_get($order, 'user_id'),
                     ])));
+                $transitioned = true;
             }
 
             $this->entitlements->revokeOrder($order);
 
             return $order->refresh();
         });
+
+        if ($order instanceof Model && $transitioned) {
+            Event::dispatch(new OrderCancelled($order, $updatedBy));
+        }
+
+        return $order;
     }
 
     /**
