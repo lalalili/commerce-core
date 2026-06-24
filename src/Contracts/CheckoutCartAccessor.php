@@ -11,4 +11,6 @@ interface CheckoutCartAccessor
     public function clearCart(): void;
 
     public function clearCheckoutCart(): void;
+
+    public function completeCheckout(): void;
 }

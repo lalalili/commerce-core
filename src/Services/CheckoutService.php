@@ -51,8 +51,7 @@ class CheckoutService
     {
         $order = $this->buildOrder($attributes);
 
-        $this->carts->clearCheckoutCart();
-        $this->carts->clearCart();
+        $this->carts->completeCheckout();
 
         return $order;
     }

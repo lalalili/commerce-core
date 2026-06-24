@@ -73,14 +73,12 @@ it('builds checkout order data through the configured order builder', function (
         ]);
 });
 
-it('clears cart sessions after completing checkout', function (): void {
+it('finalizes cart sessions after completing checkout', function (): void {
     $order = app(CheckoutService::class)->complete(['source' => 'web']);
 
     expect($order)->toBeInstanceOf(CheckoutOrderData::class)
-        ->and(CheckoutServiceFakeCartAccessor::$cleared)->toBe([
-            'checkout',
-            'cart',
-        ]);
+        ->and(CheckoutServiceFakeCartAccessor::$completed)->toBe(1)
+        ->and(CheckoutServiceFakeCartAccessor::$cleared)->toBe([]);
 });
 
 it('does not clear carts when checkout order building fails', function (): void {
@@ -98,9 +96,12 @@ class CheckoutServiceFakeCartAccessor implements CheckoutCartAccessor
      */
     public static array $cleared = [];
 
+    public static int $completed = 0;
+
     public static function reset(): void
     {
         self::$cleared = [];
+        self::$completed = 0;
     }
 
     public function cart(): mixed
@@ -121,6 +122,11 @@ class CheckoutServiceFakeCartAccessor implements CheckoutCartAccessor
     public function clearCheckoutCart(): void
     {
         self::$cleared[] = 'checkout';
+    }
+
+    public function completeCheckout(): void
+    {
+        self::$completed++;
     }
 }
 
