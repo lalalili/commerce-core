@@ -3,6 +3,7 @@
 namespace Lalalili\CommerceCore;
 
 use Lalalili\CommerceCore\Services\EntitlementService;
+use Lalalili\CommerceCore\Services\OrderLifecycleHookDispatcher;
 use Lalalili\CommerceCore\Services\OrderLifecycleService;
 use Lalalili\CommerceCore\Support\ModelAttributeMapper;
 use Lalalili\CommerceCore\Support\OrderItemNormalizer;
@@ -28,6 +29,7 @@ class CommerceCoreServiceProvider extends PackageServiceProvider
         $this->app->singleton(OrderItemNormalizer::class);
         $this->app->singleton(OrderNumberGenerator::class);
         $this->app->singleton(EntitlementService::class);
+        $this->app->singleton(OrderLifecycleHookDispatcher::class);
         $this->app->singleton(OrderLifecycleService::class);
     }
 }

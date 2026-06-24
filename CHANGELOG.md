@@ -2,6 +2,17 @@
 
 All notable changes to `lalalili/commerce-core` are documented in this file.
 
+## [0.1.8] - 2026-06-24
+
+### Added
+
+- `OrderLifecycleHook` and `commerce.lifecycle.hooks` for host-specific side effects after paid, cancelled, and refunded lifecycle transitions.
+- `OrderLifecycleService::markRefunded()` for marking payment status as refunded without cancelling the order or revoking entitlements.
+
+### Compatibility
+
+- Additive; existing `OrderLifecycleService` methods keep their public signatures.
+
 ## [0.1.7] - 2026-06-22
 
 ### Added

@@ -21,11 +21,11 @@ class Order extends Model
     {
         return [
             'payment_status' => PaymentStatus::class,
-            'invoice_type'   => InvoiceType::class,
-            'invoice_code'   => 'array',
-            'status'         => OrderStatus::class,
-            'payment_time'   => 'datetime',
-            'cancel_at'      => 'datetime',
+            'invoice_type' => InvoiceType::class,
+            'invoice_code' => 'array',
+            'status' => OrderStatus::class,
+            'payment_time' => 'datetime',
+            'cancel_at' => 'datetime',
         ];
     }
 

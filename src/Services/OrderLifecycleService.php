@@ -23,6 +23,7 @@ class OrderLifecycleService
     public function __construct(
         private readonly OrderNumberGenerator $numberGenerator,
         private readonly EntitlementService $entitlements,
+        private readonly OrderLifecycleHookDispatcher $hooks,
         private readonly ModelAttributeMapper $attributes,
         private ?OrderItemNormalizer $itemNormalizer = null,
     ) {}
@@ -157,6 +158,7 @@ class OrderLifecycleService
 
         if ($order instanceof Model && $transitioned) {
             Event::dispatch(new OrderPaid($order, $paymentStatusMessage, $paymentTime, $updatedBy));
+            $this->hooks->afterPaid($order);
         }
 
         return $order;
@@ -168,8 +170,9 @@ class OrderLifecycleService
         $orderModel = config('commerce.models.order', Order::class);
 
         $transitioned = false;
+        $refunded = false;
 
-        $order = DB::transaction(function () use ($orderNumber, $updatedBy, $orderModel, &$transitioned): ?Model {
+        $order = DB::transaction(function () use ($orderNumber, $updatedBy, $orderModel, &$transitioned, &$refunded): ?Model {
             /** @var Model|null $order */
             $order = $orderModel::query()
                 ->with([$this->detailsRelation().'.product', $this->invoicesRelation()])
@@ -181,7 +184,10 @@ class OrderLifecycleService
                 return null;
             }
 
-            if (! $this->statusEquals(data_get($order, 'status'), 'order.cancelled')) {
+            $wasCancelled = $this->statusEquals(data_get($order, 'status'), 'order.cancelled');
+            $wasPaid = $this->statusEquals(data_get($order, 'payment_status'), 'payment.complete');
+
+            if (! $wasCancelled) {
                 $paymentStatus = $this->statusEquals(data_get($order, 'payment_status'), 'payment.complete')
                     ? $this->status('payment.refunded')
                     : $this->status('payment.cancelled');
@@ -205,6 +211,7 @@ class OrderLifecycleService
                         'updated_by' => $updatedBy ?? data_get($order, 'user_id'),
                     ])));
                 $transitioned = true;
+                $refunded = $wasPaid;
             }
 
             $this->entitlements->revokeOrder($order);
@@ -214,6 +221,55 @@ class OrderLifecycleService
 
         if ($order instanceof Model && $transitioned) {
             Event::dispatch(new OrderCancelled($order, $updatedBy));
+            $this->hooks->afterCancelled($order);
+
+            if ($refunded) {
+                $this->hooks->afterRefunded($order);
+            }
+        }
+
+        return $order;
+    }
+
+    public function markRefunded(
+        string $orderNumber,
+        string $paymentStatusMessage,
+        ?int $updatedBy = null,
+    ): ?Model {
+        /** @var class-string<Order> $orderModel */
+        $orderModel = config('commerce.models.order', Order::class);
+
+        $transitioned = false;
+
+        $order = DB::transaction(function () use ($orderNumber, $paymentStatusMessage, $updatedBy, $orderModel, &$transitioned): ?Model {
+            /** @var Model|null $order */
+            $order = $orderModel::query()
+                ->where('number', $orderNumber)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $order instanceof Model) {
+                return null;
+            }
+
+            if ($this->statusEquals(data_get($order, 'payment_status'), 'payment.refunded')) {
+                return $order;
+            }
+
+            $order->update($this->attributes->filterForModel($orderModel, $this->attributes->map('orders', [
+                'payment_status' => $this->status('payment.refunded'),
+                'payment_status_message' => $paymentStatusMessage,
+                'payment_reconciled_at' => now(),
+                'updated_by' => $updatedBy ?? data_get($order, 'user_id'),
+            ])));
+
+            $transitioned = true;
+
+            return $order->refresh();
+        });
+
+        if ($order instanceof Model && $transitioned) {
+            $this->hooks->afterRefunded($order);
         }
 
         return $order;

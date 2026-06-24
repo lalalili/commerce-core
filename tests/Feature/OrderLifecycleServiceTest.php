@@ -8,6 +8,7 @@ use Lalalili\CommerceCore\Models\OrderInvoice;
 use Lalalili\CommerceCore\Models\Product;
 use Lalalili\CommerceCore\Models\ProductUser;
 use Lalalili\CommerceCore\Services\OrderLifecycleService;
+use Lalalili\CommerceCore\Tests\Support\RecordingLifecycleHook;
 
 it('creates orders from products and groups details by tax', function (): void {
     $service = app(OrderLifecycleService::class);
@@ -106,6 +107,28 @@ it('marks paid orders idempotently and grants entitlements', function (): void {
         ->and(ProductUser::query()->where('product_id', $product->id)->where('user_id', 1)->count())->toBe(1);
 });
 
+it('dispatches paid lifecycle hooks once when marking an order paid', function (): void {
+    RecordingLifecycleHook::reset();
+    config()->set('commerce.lifecycle.hooks', [RecordingLifecycleHook::class]);
+
+    $service = app(OrderLifecycleService::class);
+    $product = Product::query()->create([
+        'title' => 'Hooked paid course',
+        'type' => 1,
+        'list_price' => 1000,
+        'sales_price' => 1000,
+        'tax' => 1,
+    ]);
+    $order = $service->create(1, [['product_id' => $product->id]], ['number' => '260510HOOK']);
+
+    $service->markPaid($order->number, 'Succeeded', now());
+    $service->markPaid($order->number, 'Succeeded again', now());
+
+    expect(RecordingLifecycleHook::$events)->toBe([
+        ['event' => 'paid', 'order_number' => '260510HOOK'],
+    ]);
+});
+
 it('cancels paid orders as refunded and revokes entitlements', function (): void {
     $service = app(OrderLifecycleService::class);
     $product = Product::query()->create([
@@ -134,4 +157,94 @@ it('cancels paid orders as refunded and revokes entitlements', function (): void
         ->and($cancelled?->payment_status)->toBe(PaymentStatus::Refunded)
         ->and(ProductUser::query()->where('product_id', $product->id)->where('user_id', 1)->exists())->toBeFalse()
         ->and(OrderInvoice::query()->where('order_number', $order->number)->first()?->status)->toBe(InvoiceStatus::Cancelled);
+});
+
+it('marks paid orders as refunded without cancelling or revoking entitlements', function (): void {
+    $service = app(OrderLifecycleService::class);
+    $product = Product::query()->create([
+        'title' => 'Standalone refunded course',
+        'type' => 1,
+        'list_price' => 1000,
+        'sales_price' => 1000,
+        'tax' => 1,
+    ]);
+    $order = $service->create(1, [['product_id' => $product->id]], ['number' => '260510MRFD']);
+    $service->markPaid($order->number, 'Succeeded', now());
+
+    $refunded = $service->markRefunded($order->number, 'Refunded');
+
+    expect($refunded?->status)->toBe(OrderStatus::Complete)
+        ->and($refunded?->payment_status)->toBe(PaymentStatus::Refunded)
+        ->and($refunded?->payment_status_message)->toBe('Refunded')
+        ->and(ProductUser::query()->where('product_id', $product->id)->where('user_id', 1)->exists())->toBeTrue();
+});
+
+it('dispatches cancelled and refunded hooks only for the first paid cancellation', function (): void {
+    RecordingLifecycleHook::reset();
+    config()->set('commerce.lifecycle.hooks', [RecordingLifecycleHook::class]);
+
+    $service = app(OrderLifecycleService::class);
+    $product = Product::query()->create([
+        'title' => 'Hooked refunded course',
+        'type' => 1,
+        'list_price' => 1000,
+        'sales_price' => 1000,
+        'tax' => 1,
+    ]);
+    $order = $service->create(1, [['product_id' => $product->id]], ['number' => '260510CANC']);
+    $service->markPaid($order->number, 'Succeeded', now());
+    RecordingLifecycleHook::reset();
+
+    $service->cancel($order->number);
+    $service->cancel($order->number);
+
+    expect(RecordingLifecycleHook::$events)->toBe([
+        ['event' => 'cancelled', 'order_number' => '260510CANC'],
+        ['event' => 'refunded', 'order_number' => '260510CANC'],
+    ]);
+});
+
+it('dispatches refunded hooks once when marking an order refunded', function (): void {
+    RecordingLifecycleHook::reset();
+    config()->set('commerce.lifecycle.hooks', [RecordingLifecycleHook::class]);
+
+    $service = app(OrderLifecycleService::class);
+    $product = Product::query()->create([
+        'title' => 'Hooked standalone refunded course',
+        'type' => 1,
+        'list_price' => 1000,
+        'sales_price' => 1000,
+        'tax' => 1,
+    ]);
+    $order = $service->create(1, [['product_id' => $product->id]], ['number' => '260510RFHK']);
+    $service->markPaid($order->number, 'Succeeded', now());
+    RecordingLifecycleHook::reset();
+
+    $service->markRefunded($order->number, 'Refunded');
+    $service->markRefunded($order->number, 'Refunded again');
+
+    expect(RecordingLifecycleHook::$events)->toBe([
+        ['event' => 'refunded', 'order_number' => '260510RFHK'],
+    ]);
+});
+
+it('does not dispatch refunded hooks for unpaid cancellations', function (): void {
+    RecordingLifecycleHook::reset();
+    config()->set('commerce.lifecycle.hooks', [RecordingLifecycleHook::class]);
+
+    $service = app(OrderLifecycleService::class);
+    $product = Product::query()->create([
+        'title' => 'Hooked cancelled course',
+        'type' => 1,
+        'list_price' => 1000,
+        'sales_price' => 1000,
+        'tax' => 1,
+    ]);
+    $order = $service->create(1, [['product_id' => $product->id]], ['number' => '260510VOID']);
+
+    $service->cancel($order->number);
+
+    expect(RecordingLifecycleHook::$events)->toBe([
+        ['event' => 'cancelled', 'order_number' => '260510VOID'],
+    ]);
 });

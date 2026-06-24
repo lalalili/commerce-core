@@ -8,8 +8,9 @@ Reusable product, order, invoice, payment log, and entitlement core for Laravel 
 
 - Configurable product, order, detail, invoice, payment log, and entitlement models.
 - Configurable table names and column mappings for host compatibility.
-- Order creation, paid, cancel, and tax grouping lifecycle services.
+- Order creation, paid, refunded, cancel, and tax grouping lifecycle services.
 - Entitlement grant/revoke support through product-user records.
+- Host lifecycle hooks for project-specific side effects after paid, refunded, or cancelled transitions.
 - Order number generation and attribute mapping helpers.
 
 ## Installation
@@ -41,6 +42,7 @@ Publish `config/commerce.php` to customize:
 - table names
 - relationship names
 - entitlement behavior
+- lifecycle hooks
 - host column mappings
 - order, payment, and invoice status mappings
 
@@ -84,6 +86,29 @@ Cancel an order and revoke entitlements:
 ```php
 app(OrderLifecycleService::class)->cancel($order->number, updatedBy: $user->id);
 ```
+
+Mark an order as refunded without cancelling it:
+
+```php
+app(OrderLifecycleService::class)->markRefunded(
+    orderNumber: $order->number,
+    paymentStatusMessage: 'refunded',
+    updatedBy: $user->id,
+);
+```
+
+Register host lifecycle hooks for project-specific side effects:
+
+```php
+// config/commerce.php
+'lifecycle' => [
+    'hooks' => [
+        App\Commerce\EbookEntitlementLifecycleHook::class,
+    ],
+],
+```
+
+Hooks must implement `Lalalili\CommerceCore\Contracts\OrderLifecycleHook`.
 
 ## Boundaries
 

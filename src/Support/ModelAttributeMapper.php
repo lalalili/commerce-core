@@ -58,7 +58,7 @@ class ModelAttributeMapper
     public function filterForModel(string $modelClass, array $attributes): array
     {
         /** @var Model $model */
-        $model = new $modelClass();
+        $model = new $modelClass;
 
         return collect($attributes)
             ->filter(fn (mixed $value, string $column): bool => $this->hasColumn($model, $column))
