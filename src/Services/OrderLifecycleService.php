@@ -194,6 +194,8 @@ class OrderLifecycleService
                 || ($refundWhenOrderStatuses !== [] && $this->statusIn(data_get($order, 'status'), $refundWhenOrderStatuses));
 
             if (! $wasCancelled) {
+                $this->hooks->beforeCancelled($order);
+
                 $paymentStatus = $wasPaid
                     ? $this->status('payment.refunded')
                     : $this->status('payment.cancelled');

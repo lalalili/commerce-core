@@ -10,6 +10,7 @@ use Lalalili\CommerceCore\Models\OrderInvoice;
 use Lalalili\CommerceCore\Models\Product;
 use Lalalili\CommerceCore\Models\ProductUser;
 use Lalalili\CommerceCore\Services\OrderLifecycleService;
+use Lalalili\CommerceCore\Tests\Support\RecordingCancellationLifecycleHook;
 use Lalalili\CommerceCore\Tests\Support\RecordingLifecycleHook;
 
 it('creates orders from products and groups details by tax', function (): void {
@@ -205,6 +206,61 @@ it('can treat configured order statuses as refundable when cancelling', function
     expect(RecordingLifecycleHook::$events)->toBe([
         ['event' => 'cancelled', 'order_number' => '260510RFST'],
         ['event' => 'refunded', 'order_number' => '260510RFST'],
+    ]);
+});
+
+it('runs cancellable lifecycle hooks before cancelling an order', function (): void {
+    RecordingCancellationLifecycleHook::reset();
+    config()->set('commerce.lifecycle.hooks', [RecordingCancellationLifecycleHook::class]);
+
+    $service = app(OrderLifecycleService::class);
+    $product = Product::query()->create([
+        'title' => 'Before cancelled hook course',
+        'type' => 1,
+        'list_price' => 1000,
+        'sales_price' => 1000,
+        'tax' => 1,
+    ]);
+    $order = $service->create(1, [['product_id' => $product->id]], ['number' => '260510BCHK']);
+    RecordingCancellationLifecycleHook::reset();
+
+    $service->cancel($order->number);
+    $service->cancel($order->number);
+
+    expect(RecordingCancellationLifecycleHook::$events)->toBe([
+        ['event' => 'before_cancelled', 'order_number' => '260510BCHK'],
+        ['event' => 'cancelled', 'order_number' => '260510BCHK'],
+    ]);
+});
+
+it('rolls back cancellation when a cancellable lifecycle hook fails', function (): void {
+    RecordingCancellationLifecycleHook::reset();
+    RecordingCancellationLifecycleHook::$throwBeforeCancelled = true;
+    config()->set('commerce.lifecycle.hooks', [RecordingCancellationLifecycleHook::class]);
+
+    $service = app(OrderLifecycleService::class);
+    $product = Product::query()->create([
+        'title' => 'Blocked cancelled hook course',
+        'type' => 1,
+        'list_price' => 1000,
+        'sales_price' => 1000,
+        'tax' => 1,
+    ]);
+    $order = $service->create(1, [['product_id' => $product->id]], ['number' => '260510BLCK']);
+    RecordingCancellationLifecycleHook::reset();
+    RecordingCancellationLifecycleHook::$throwBeforeCancelled = true;
+
+    expect(fn () => $service->cancel($order->number))
+        ->toThrow(RuntimeException::class, 'Cancellation was blocked by the lifecycle hook.');
+
+    $order->refresh();
+
+    expect($order->status)->toBe(OrderStatus::Pending)
+        ->and($order->payment_status)->toBe(PaymentStatus::Pending)
+        ->and($order->cancel_at)->toBeNull();
+
+    expect(RecordingCancellationLifecycleHook::$events)->toBe([
+        ['event' => 'before_cancelled', 'order_number' => '260510BLCK'],
     ]);
 });
 

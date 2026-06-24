@@ -5,6 +5,7 @@ namespace Lalalili\CommerceCore\Services;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Eloquent\Model;
 use InvalidArgumentException;
+use Lalalili\CommerceCore\Contracts\OrderCancellationLifecycleHook;
 use Lalalili\CommerceCore\Contracts\OrderFulfillmentLifecycleHook;
 use Lalalili\CommerceCore\Contracts\OrderLifecycleHook;
 
@@ -16,6 +17,15 @@ class OrderLifecycleHookDispatcher
     {
         foreach ($this->hooks() as $hook) {
             $hook->afterPaid($order);
+        }
+    }
+
+    public function beforeCancelled(Model $order): void
+    {
+        foreach ($this->hooks() as $hook) {
+            if ($hook instanceof OrderCancellationLifecycleHook) {
+                $hook->beforeCancelled($order);
+            }
         }
     }
 
