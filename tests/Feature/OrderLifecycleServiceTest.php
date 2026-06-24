@@ -109,6 +109,23 @@ it('marks paid orders idempotently and grants entitlements', function (): void {
         ->and(ProductUser::query()->where('product_id', $product->id)->where('user_id', 1)->count())->toBe(1);
 });
 
+it('accepts string lifecycle actors for host updated by columns', function (): void {
+    $service = app(OrderLifecycleService::class);
+    $product = Product::query()->create([
+        'title' => 'String actor course',
+        'type' => 1,
+        'list_price' => 1000,
+        'sales_price' => 1000,
+        'tax' => 1,
+    ]);
+    $order = $service->create(1, [['product_id' => $product->id]], ['number' => '260510ACTR']);
+
+    $paid = $service->markPaid($order->number, 'Succeeded', now(), 'paidOrder');
+
+    expect($paid?->updated_by)->toBe('paidOrder')
+        ->and($paid?->details()->sole()->updated_by)->toBe('paidOrder');
+});
+
 it('dispatches paid lifecycle hooks once when marking an order paid', function (): void {
     RecordingLifecycleHook::reset();
     config()->set('commerce.lifecycle.hooks', [RecordingLifecycleHook::class]);

@@ -10,7 +10,7 @@ class EntitlementService
 {
     public function __construct(private readonly ModelAttributeMapper $attributes) {}
 
-    public function grantOrder(Model $order, ?int $createdBy = null): void
+    public function grantOrder(Model $order, int|string|null $createdBy = null): void
     {
         if (! $this->enabled()) {
             return;

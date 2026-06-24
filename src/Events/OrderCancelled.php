@@ -11,6 +11,6 @@ final class OrderCancelled
 {
     public function __construct(
         public readonly Model $order,
-        public readonly ?int $updatedBy = null,
+        public readonly int|string|null $updatedBy = null,
     ) {}
 }

@@ -14,6 +14,6 @@ final class OrderPaid
         public readonly Model $order,
         public readonly string $paymentStatusMessage,
         public readonly CarbonInterface $paymentTime,
-        public readonly ?int $updatedBy = null,
+        public readonly int|string|null $updatedBy = null,
     ) {}
 }

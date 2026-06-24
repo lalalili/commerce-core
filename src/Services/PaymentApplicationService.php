@@ -17,7 +17,7 @@ class PaymentApplicationService
         private readonly PaymentApplicationHookDispatcher $hooks,
     ) {}
 
-    public function apply(PaymentApplicationData $payment, ?int $updatedBy = null): ?Model
+    public function apply(PaymentApplicationData $payment, int|string|null $updatedBy = null): ?Model
     {
         $this->paymentLogs->record(
             orderNumber: $payment->orderNumber,
@@ -49,7 +49,7 @@ class PaymentApplicationService
         return $applied;
     }
 
-    private function applyPaid(Model $order, PaymentApplicationData $payment, ?int $updatedBy): ?Model
+    private function applyPaid(Model $order, PaymentApplicationData $payment, int|string|null $updatedBy): ?Model
     {
         if ($payment->paidAt === null) {
             return $this->updatePaymentMessage($order, $payment->orderMessage());

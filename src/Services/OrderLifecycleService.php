@@ -112,7 +112,7 @@ class OrderLifecycleService
         string $orderNumber,
         string $paymentStatusMessage,
         CarbonInterface $paymentTime,
-        ?int $updatedBy = null,
+        int|string|null $updatedBy = null,
     ): ?Model {
         /** @var class-string<Order> $orderModel */
         $orderModel = config('commerce.models.order', Order::class);
@@ -166,7 +166,7 @@ class OrderLifecycleService
         return $order;
     }
 
-    public function cancel(string $orderNumber, ?int $updatedBy = null): ?Model
+    public function cancel(string $orderNumber, int|string|null $updatedBy = null): ?Model
     {
         /** @var class-string<Order> $orderModel */
         $orderModel = config('commerce.models.order', Order::class);
@@ -236,7 +236,7 @@ class OrderLifecycleService
     public function markRefunded(
         string $orderNumber,
         string $paymentStatusMessage,
-        ?int $updatedBy = null,
+        int|string|null $updatedBy = null,
     ): ?Model {
         /** @var class-string<Order> $orderModel */
         $orderModel = config('commerce.models.order', Order::class);
@@ -277,7 +277,7 @@ class OrderLifecycleService
         return $order;
     }
 
-    public function markShipped(string $orderNumber, ?int $updatedBy = null): ?Model
+    public function markShipped(string $orderNumber, int|string|null $updatedBy = null): ?Model
     {
         /** @var class-string<Order> $orderModel */
         $orderModel = config('commerce.models.order', Order::class);
@@ -324,7 +324,7 @@ class OrderLifecycleService
         return $order;
     }
 
-    public function markFinished(string $orderNumber, ?int $updatedBy = null): ?Model
+    public function markFinished(string $orderNumber, int|string|null $updatedBy = null): ?Model
     {
         /** @var class-string<Order> $orderModel */
         $orderModel = config('commerce.models.order', Order::class);
