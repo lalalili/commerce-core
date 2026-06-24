@@ -304,6 +304,7 @@ class OrderLifecycleService
             $order->update($this->attributes->filterForModel($orderModel, $this->attributes->map('orders', [
                 'status' => $shippingStatus,
                 'updated_by' => $updatedBy ?? data_get($order, 'user_id'),
+                'shipping_at' => now(),
             ])));
 
             $order->{$this->detailsRelation()}()->update($this->attributes->filterForModel($this->detailModel(), $this->attributes->map('order_details', [

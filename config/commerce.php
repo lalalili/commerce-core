@@ -80,6 +80,7 @@ return [
             'status' => 'status',
             'created_by' => 'created_by',
             'updated_by' => 'updated_by',
+            'shipping_at' => 'shipping_at',
             'cancel_at' => 'cancel_at',
         ],
         'order_details' => [

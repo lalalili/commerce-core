@@ -49,6 +49,7 @@ return new class extends Migration
             $table->unsignedTinyInteger('status')->default(0)->index();
             $table->foreignId('created_by')->nullable()->index();
             $table->foreignId('updated_by')->nullable()->index();
+            $table->dateTime('shipping_at')->nullable();
             $table->dateTime('cancel_at')->nullable();
             $table->timestamps();
             $table->softDeletes();

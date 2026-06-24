@@ -25,6 +25,7 @@ class Order extends Model
             'invoice_code' => 'array',
             'status' => OrderStatus::class,
             'payment_time' => 'datetime',
+            'shipping_at' => 'datetime',
             'cancel_at' => 'datetime',
         ];
     }

@@ -289,6 +289,7 @@ it('marks orders as shipped idempotently and dispatches fulfillment hooks once',
     $service->markShipped($order->number, 9);
 
     expect($shipped?->status)->toBe(OrderStatus::Shipping)
+        ->and($shipped?->shipping_at)->not->toBeNull()
         ->and($shipped?->details()->pluck('status')->unique()->values()->all())->toBe([OrderStatus::Shipping]);
 
     Event::assertDispatched(OrderShipped::class, 1);
