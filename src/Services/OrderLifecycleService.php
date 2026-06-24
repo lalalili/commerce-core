@@ -166,7 +166,10 @@ class OrderLifecycleService
         return $order;
     }
 
-    public function cancel(string $orderNumber, int|string|null $updatedBy = null): ?Model
+    /**
+     * @param  list<mixed>  $refundWhenOrderStatuses
+     */
+    public function cancel(string $orderNumber, int|string|null $updatedBy = null, array $refundWhenOrderStatuses = []): ?Model
     {
         /** @var class-string<Order> $orderModel */
         $orderModel = config('commerce.models.order', Order::class);
@@ -174,7 +177,7 @@ class OrderLifecycleService
         $transitioned = false;
         $refunded = false;
 
-        $order = DB::transaction(function () use ($orderNumber, $updatedBy, $orderModel, &$transitioned, &$refunded): ?Model {
+        $order = DB::transaction(function () use ($orderNumber, $updatedBy, $refundWhenOrderStatuses, $orderModel, &$transitioned, &$refunded): ?Model {
             /** @var Model|null $order */
             $order = $orderModel::query()
                 ->with([$this->detailsRelation().'.product', $this->invoicesRelation()])
@@ -187,10 +190,11 @@ class OrderLifecycleService
             }
 
             $wasCancelled = $this->statusEquals(data_get($order, 'status'), 'order.cancelled');
-            $wasPaid = $this->statusEquals(data_get($order, 'payment_status'), 'payment.complete');
+            $wasPaid = $this->statusEquals(data_get($order, 'payment_status'), 'payment.complete')
+                || ($refundWhenOrderStatuses !== [] && $this->statusIn(data_get($order, 'status'), $refundWhenOrderStatuses));
 
             if (! $wasCancelled) {
-                $paymentStatus = $this->statusEquals(data_get($order, 'payment_status'), 'payment.complete')
+                $paymentStatus = $wasPaid
                     ? $this->status('payment.refunded')
                     : $this->status('payment.cancelled');
 

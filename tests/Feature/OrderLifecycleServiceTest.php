@@ -178,6 +178,36 @@ it('cancels paid orders as refunded and revokes entitlements', function (): void
         ->and(OrderInvoice::query()->where('order_number', $order->number)->first()?->status)->toBe(InvoiceStatus::Cancelled);
 });
 
+it('can treat configured order statuses as refundable when cancelling', function (): void {
+    RecordingLifecycleHook::reset();
+    config()->set('commerce.lifecycle.hooks', [RecordingLifecycleHook::class]);
+
+    $service = app(OrderLifecycleService::class);
+    $product = Product::query()->create([
+        'title' => 'Refundable by order status course',
+        'type' => 1,
+        'list_price' => 1000,
+        'sales_price' => 1000,
+        'tax' => 1,
+    ]);
+    $order = $service->create(1, [['product_id' => $product->id]], ['number' => '260510RFST']);
+    $order->update([
+        'status' => OrderStatus::Complete,
+        'payment_status' => PaymentStatus::Pending,
+    ]);
+    RecordingLifecycleHook::reset();
+
+    $cancelled = $service->cancel($order->number, 9, [OrderStatus::Complete]);
+
+    expect($cancelled?->status)->toBe(OrderStatus::Cancelled)
+        ->and($cancelled?->payment_status)->toBe(PaymentStatus::Refunded);
+
+    expect(RecordingLifecycleHook::$events)->toBe([
+        ['event' => 'cancelled', 'order_number' => '260510RFST'],
+        ['event' => 'refunded', 'order_number' => '260510RFST'],
+    ]);
+});
+
 it('marks paid orders as refunded without cancelling or revoking entitlements', function (): void {
     $service = app(OrderLifecycleService::class);
     $product = Product::query()->create([
