@@ -6,7 +6,10 @@ use Lalalili\CommerceCore\DTOs\CouponCheckoutResult;
 
 interface CouponCheckoutAdapter
 {
-    public function apply(string $kind, string $code, mixed $checkoutCart): CouponCheckoutResult;
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    public function apply(string $kind, string $code, mixed $checkoutCart, array $context = []): CouponCheckoutResult;
 
     public function clear(string $kind, mixed $checkoutCart): void;
 }

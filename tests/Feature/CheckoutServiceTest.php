@@ -19,7 +19,7 @@ beforeEach(function (): void {
 });
 
 it('applies coupons against the checkout cart', function (): void {
-    $result = app(CheckoutService::class)->applyCoupon('member', 'MEMBER-100');
+    $result = app(CheckoutService::class)->applyCoupon('member', 'MEMBER-100', ['order_total' => 900]);
 
     expect($result->toArray())->toBe([
         'success' => true,
@@ -34,6 +34,7 @@ it('applies coupons against the checkout cart', function (): void {
                 'kind' => 'member',
                 'code' => 'MEMBER-100',
                 'cart' => 'checkout-cart',
+                'context' => ['order_total' => 900],
             ],
         ]);
 });
@@ -133,7 +134,7 @@ class CheckoutServiceFakeCartAccessor implements CheckoutCartAccessor
 class CheckoutServiceFakeCouponAdapter implements CouponCheckoutAdapter
 {
     /**
-     * @var list<array{kind:string, code:string, cart:mixed}>
+     * @var list<array{kind:string, code:string, cart:mixed, context:array<string, mixed>}>
      */
     public static array $applied = [];
 
@@ -148,12 +149,16 @@ class CheckoutServiceFakeCouponAdapter implements CouponCheckoutAdapter
         self::$cleared = [];
     }
 
-    public function apply(string $kind, string $code, mixed $checkoutCart): CouponCheckoutResult
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    public function apply(string $kind, string $code, mixed $checkoutCart, array $context = []): CouponCheckoutResult
     {
         self::$applied[] = [
             'kind' => $kind,
             'code' => $code,
             'cart' => $checkoutCart,
+            'context' => $context,
         ];
 
         return new CouponCheckoutResult(true, 'applied', [

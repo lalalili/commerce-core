@@ -26,9 +26,12 @@ class CheckoutService
         return $this->carts->checkoutCart();
     }
 
-    public function applyCoupon(string $kind, string $code): CouponCheckoutResult
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    public function applyCoupon(string $kind, string $code, array $context = []): CouponCheckoutResult
     {
-        return $this->coupons->apply($kind, $code, $this->checkoutCart());
+        return $this->coupons->apply($kind, $code, $this->checkoutCart(), $context);
     }
 
     public function clearCoupon(string $kind): void
