@@ -233,6 +233,42 @@ it('runs cancellable lifecycle hooks before cancelling an order', function (): v
     ]);
 });
 
+it('can cancel configured invoice statuses when cancelling an order', function (): void {
+    $service = app(OrderLifecycleService::class);
+    $product = Product::query()->create([
+        'title' => 'Configured invoice cancellation course',
+        'type' => 1,
+        'list_price' => 1000,
+        'sales_price' => 1000,
+        'tax' => 1,
+    ]);
+    $order = $service->create(1, [['product_id' => $product->id]], ['number' => '260510CINV']);
+
+    OrderInvoice::query()->create([
+        'user_id' => 1,
+        'order_id' => $order->id,
+        'order_number' => $order->number,
+        'total_sales_price' => 1000,
+        'type' => 1,
+        'number' => null,
+        'status' => InvoiceStatus::Pending,
+    ]);
+    OrderInvoice::query()->create([
+        'user_id' => 1,
+        'order_id' => $order->id,
+        'order_number' => $order->number,
+        'total_sales_price' => 1000,
+        'type' => 1,
+        'number' => 'AB12345678',
+        'status' => InvoiceStatus::Complete,
+    ]);
+
+    $service->cancel($order->number, 9, [], [InvoiceStatus::Pending, InvoiceStatus::Complete]);
+
+    expect(OrderInvoice::query()->where('order_number', $order->number)->pluck('status')->all())
+        ->toBe([InvoiceStatus::Cancelled, InvoiceStatus::Cancelled]);
+});
+
 it('rolls back cancellation when a cancellable lifecycle hook fails', function (): void {
     RecordingCancellationLifecycleHook::reset();
     RecordingCancellationLifecycleHook::$throwBeforeCancelled = true;

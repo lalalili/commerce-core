@@ -168,16 +168,22 @@ class OrderLifecycleService
 
     /**
      * @param  list<mixed>  $refundWhenOrderStatuses
+     * @param  list<mixed>|null  $cancelInvoiceStatuses
      */
-    public function cancel(string $orderNumber, int|string|null $updatedBy = null, array $refundWhenOrderStatuses = []): ?Model
-    {
+    public function cancel(
+        string $orderNumber,
+        int|string|null $updatedBy = null,
+        array $refundWhenOrderStatuses = [],
+        ?array $cancelInvoiceStatuses = null,
+    ): ?Model {
         /** @var class-string<Order> $orderModel */
         $orderModel = config('commerce.models.order', Order::class);
 
         $transitioned = false;
         $refunded = false;
+        $cancelInvoiceStatuses ??= [$this->status('invoice.complete')];
 
-        $order = DB::transaction(function () use ($orderNumber, $updatedBy, $refundWhenOrderStatuses, $orderModel, &$transitioned, &$refunded): ?Model {
+        $order = DB::transaction(function () use ($orderNumber, $updatedBy, $refundWhenOrderStatuses, $cancelInvoiceStatuses, $orderModel, &$transitioned, &$refunded): ?Model {
             /** @var Model|null $order */
             $order = $orderModel::query()
                 ->with([$this->detailsRelation().'.product', $this->invoicesRelation()])
@@ -212,12 +218,14 @@ class OrderLifecycleService
                     'updated_by' => $updatedBy ?? data_get($order, 'user_id'),
                 ])));
 
-                $order->{$this->invoicesRelation()}()
-                    ->where('status', $this->status('invoice.complete'))
-                    ->update($this->attributes->filterForModel($this->invoiceModel(), $this->attributes->map('order_invoices', [
-                        'status' => $this->status('invoice.cancelled'),
-                        'updated_by' => $updatedBy ?? data_get($order, 'user_id'),
-                    ])));
+                if ($cancelInvoiceStatuses !== []) {
+                    $order->{$this->invoicesRelation()}()
+                        ->whereIn('status', $cancelInvoiceStatuses)
+                        ->update($this->attributes->filterForModel($this->invoiceModel(), $this->attributes->map('order_invoices', [
+                            'status' => $this->status('invoice.cancelled'),
+                            'updated_by' => $updatedBy ?? data_get($order, 'user_id'),
+                        ])));
+                }
                 $transitioned = true;
                 $refunded = $wasPaid;
             }
