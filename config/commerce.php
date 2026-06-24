@@ -114,6 +114,8 @@ return [
             'pending' => OrderStatus::Pending,
             'paid' => OrderStatus::Complete,
             'complete' => OrderStatus::Complete,
+            'shipping' => OrderStatus::Shipping,
+            'finished' => OrderStatus::Finished,
             'cancelled' => OrderStatus::Cancelled,
         ],
         'payment' => [

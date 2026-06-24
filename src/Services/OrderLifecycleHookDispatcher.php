@@ -5,6 +5,7 @@ namespace Lalalili\CommerceCore\Services;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Eloquent\Model;
 use InvalidArgumentException;
+use Lalalili\CommerceCore\Contracts\OrderFulfillmentLifecycleHook;
 use Lalalili\CommerceCore\Contracts\OrderLifecycleHook;
 
 class OrderLifecycleHookDispatcher
@@ -29,6 +30,24 @@ class OrderLifecycleHookDispatcher
     {
         foreach ($this->hooks() as $hook) {
             $hook->afterRefunded($order);
+        }
+    }
+
+    public function afterShipped(Model $order): void
+    {
+        foreach ($this->hooks() as $hook) {
+            if ($hook instanceof OrderFulfillmentLifecycleHook) {
+                $hook->afterShipped($order);
+            }
+        }
+    }
+
+    public function afterFinished(Model $order): void
+    {
+        foreach ($this->hooks() as $hook) {
+            if ($hook instanceof OrderFulfillmentLifecycleHook) {
+                $hook->afterFinished($order);
+            }
         }
     }
 

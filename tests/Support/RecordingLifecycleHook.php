@@ -3,9 +3,10 @@
 namespace Lalalili\CommerceCore\Tests\Support;
 
 use Illuminate\Database\Eloquent\Model;
+use Lalalili\CommerceCore\Contracts\OrderFulfillmentLifecycleHook;
 use Lalalili\CommerceCore\Contracts\OrderLifecycleHook;
 
-class RecordingLifecycleHook implements OrderLifecycleHook
+class RecordingLifecycleHook implements OrderFulfillmentLifecycleHook, OrderLifecycleHook
 {
     /**
      * @var list<array{event:string, order_number:string}>
@@ -32,6 +33,22 @@ class RecordingLifecycleHook implements OrderLifecycleHook
     {
         self::$events[] = [
             'event' => 'refunded',
+            'order_number' => (string) data_get($order, 'number'),
+        ];
+    }
+
+    public function afterShipped(Model $order): void
+    {
+        self::$events[] = [
+            'event' => 'shipped',
+            'order_number' => (string) data_get($order, 'number'),
+        ];
+    }
+
+    public function afterFinished(Model $order): void
+    {
+        self::$events[] = [
+            'event' => 'finished',
             'order_number' => (string) data_get($order, 'number'),
         ];
     }

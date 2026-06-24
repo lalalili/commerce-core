@@ -9,7 +9,9 @@ use Illuminate\Support\Facades\Event;
 use Lalalili\CommerceCore\DTOs\OrderItemData;
 use Lalalili\CommerceCore\Events\OrderCancelled;
 use Lalalili\CommerceCore\Events\OrderCreated;
+use Lalalili\CommerceCore\Events\OrderFinished;
 use Lalalili\CommerceCore\Events\OrderPaid;
+use Lalalili\CommerceCore\Events\OrderShipped;
 use Lalalili\CommerceCore\Models\Order;
 use Lalalili\CommerceCore\Models\OrderDetail;
 use Lalalili\CommerceCore\Models\OrderInvoice;
@@ -270,6 +272,103 @@ class OrderLifecycleService
 
         if ($order instanceof Model && $transitioned) {
             $this->hooks->afterRefunded($order);
+        }
+
+        return $order;
+    }
+
+    public function markShipped(string $orderNumber, ?int $updatedBy = null): ?Model
+    {
+        /** @var class-string<Order> $orderModel */
+        $orderModel = config('commerce.models.order', Order::class);
+
+        $transitioned = false;
+
+        $order = DB::transaction(function () use ($orderNumber, $updatedBy, $orderModel, &$transitioned): ?Model {
+            /** @var Model|null $order */
+            $order = $orderModel::query()
+                ->where('number', $orderNumber)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $order instanceof Model) {
+                return null;
+            }
+
+            if ($this->statusEquals(data_get($order, 'status'), 'order.shipping')) {
+                return $order;
+            }
+
+            $shippingStatus = $this->status('order.shipping');
+
+            $order->update($this->attributes->filterForModel($orderModel, $this->attributes->map('orders', [
+                'status' => $shippingStatus,
+                'updated_by' => $updatedBy ?? data_get($order, 'user_id'),
+            ])));
+
+            $order->{$this->detailsRelation()}()->update($this->attributes->filterForModel($this->detailModel(), $this->attributes->map('order_details', [
+                'status' => $shippingStatus,
+                'updated_by' => $updatedBy ?? data_get($order, 'user_id'),
+            ])));
+
+            $transitioned = true;
+
+            return $order->refresh();
+        });
+
+        if ($order instanceof Model && $transitioned) {
+            Event::dispatch(new OrderShipped($order, updatedBy: $updatedBy));
+            $this->hooks->afterShipped($order);
+        }
+
+        return $order;
+    }
+
+    public function markFinished(string $orderNumber, ?int $updatedBy = null): ?Model
+    {
+        /** @var class-string<Order> $orderModel */
+        $orderModel = config('commerce.models.order', Order::class);
+
+        $transitioned = false;
+
+        $order = DB::transaction(function () use ($orderNumber, $updatedBy, $orderModel, &$transitioned): ?Model {
+            /** @var Model|null $order */
+            $order = $orderModel::query()
+                ->where('number', $orderNumber)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $order instanceof Model) {
+                return null;
+            }
+
+            $isFinished = $this->statusEquals(data_get($order, 'status'), 'order.finished');
+            $isPaid = $this->statusEquals(data_get($order, 'payment_status'), 'payment.complete');
+            if ($isFinished && $isPaid) {
+                return $order;
+            }
+
+            $finishedStatus = $this->status('order.finished');
+
+            $order->update($this->attributes->filterForModel($orderModel, $this->attributes->map('orders', [
+                'status' => $finishedStatus,
+                'payment_status' => $this->status('payment.complete'),
+                'updated_by' => $updatedBy ?? data_get($order, 'user_id'),
+            ])));
+
+            $order->{$this->detailsRelation()}()->update($this->attributes->filterForModel($this->detailModel(), $this->attributes->map('order_details', [
+                'status' => $finishedStatus,
+                'updated_by' => $updatedBy ?? data_get($order, 'user_id'),
+            ])));
+
+            $transitioned = true;
+
+            return $order->refresh();
+        });
+
+        if ($order instanceof Model && $transitioned) {
+            Event::dispatch(new OrderFinished($order, $updatedBy));
+            $this->hooks->afterFinished($order);
         }
 
         return $order;

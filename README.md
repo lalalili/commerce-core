@@ -8,9 +8,10 @@ Reusable product, order, invoice, payment log, and entitlement core for Laravel 
 
 - Configurable product, order, detail, invoice, payment log, and entitlement models.
 - Configurable table names and column mappings for host compatibility.
-- Order creation, paid, refunded, cancel, and tax grouping lifecycle services.
+- Order creation, paid, shipped, finished, refunded, cancel, and tax grouping lifecycle services.
+- Payment log upsert helper for gateway reconciliation adapters.
 - Entitlement grant/revoke support through product-user records.
-- Host lifecycle hooks for project-specific side effects after paid, refunded, or cancelled transitions.
+- Host lifecycle hooks for project-specific side effects after paid, refunded, cancelled, shipped, or finished transitions.
 - Order number generation and attribute mapping helpers.
 
 ## Installation
@@ -97,6 +98,26 @@ app(OrderLifecycleService::class)->markRefunded(
 );
 ```
 
+Mark fulfillment states:
+
+```php
+app(OrderLifecycleService::class)->markShipped($order->number, updatedBy: $user->id);
+app(OrderLifecycleService::class)->markFinished($order->number, updatedBy: $user->id);
+```
+
+Record a normalized payment log:
+
+```php
+use Lalalili\CommerceCore\Services\PaymentLogService;
+
+app(PaymentLogService::class)->record(
+    orderNumber: $order->number,
+    payload: $gatewayPayload,
+    statusCode: $statusCode,
+    statusMessage: $statusMessage,
+);
+```
+
 Register host lifecycle hooks for project-specific side effects:
 
 ```php
@@ -109,6 +130,8 @@ Register host lifecycle hooks for project-specific side effects:
 ```
 
 Hooks must implement `Lalalili\CommerceCore\Contracts\OrderLifecycleHook`.
+To receive shipped or finished callbacks, the same hook class may also implement
+`Lalalili\CommerceCore\Contracts\OrderFulfillmentLifecycleHook`.
 
 ## Boundaries
 

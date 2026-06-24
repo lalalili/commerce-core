@@ -2,6 +2,20 @@
 
 All notable changes to `lalalili/commerce-core` are documented in this file.
 
+## [0.1.9] - 2026-06-24
+
+### Added
+
+- `OrderLifecycleService::markShipped()` and `markFinished()` for fulfillment lifecycle transitions.
+- `OrderFulfillmentLifecycleHook` for optional host callbacks after shipped and finished transitions.
+- `OrderFinished` event and `OrderShipped` dispatching from `markShipped()`.
+- `PaymentLogService::record()` for upserting gateway payment logs by order number and status code.
+- `commerce.statuses.order.shipping` and `commerce.statuses.order.finished` status mappings.
+
+### Compatibility
+
+- Additive; existing lifecycle hooks remain valid and do not need to implement the fulfillment hook contract.
+
 ## [0.1.8] - 2026-06-24
 
 ### Added

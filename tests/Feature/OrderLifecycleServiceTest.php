@@ -3,6 +3,8 @@
 use Lalalili\CommerceCore\Enums\InvoiceStatus;
 use Lalalili\CommerceCore\Enums\OrderStatus;
 use Lalalili\CommerceCore\Enums\PaymentStatus;
+use Lalalili\CommerceCore\Events\OrderFinished;
+use Lalalili\CommerceCore\Events\OrderShipped;
 use Lalalili\CommerceCore\Models\Order;
 use Lalalili\CommerceCore\Models\OrderInvoice;
 use Lalalili\CommerceCore\Models\Product;
@@ -246,5 +248,62 @@ it('does not dispatch refunded hooks for unpaid cancellations', function (): voi
 
     expect(RecordingLifecycleHook::$events)->toBe([
         ['event' => 'cancelled', 'order_number' => '260510VOID'],
+    ]);
+});
+
+it('marks orders as shipped idempotently and dispatches fulfillment hooks once', function (): void {
+    RecordingLifecycleHook::reset();
+    Event::fake([OrderShipped::class]);
+    config()->set('commerce.lifecycle.hooks', [RecordingLifecycleHook::class]);
+
+    $service = app(OrderLifecycleService::class);
+    $product = Product::query()->create([
+        'title' => 'Shipped course',
+        'type' => 1,
+        'list_price' => 1000,
+        'sales_price' => 1000,
+        'tax' => 1,
+    ]);
+    $order = $service->create(1, [['product_id' => $product->id]], ['number' => '260510SHIP']);
+    $service->markPaid($order->number, 'Succeeded', now());
+    RecordingLifecycleHook::reset();
+
+    $shipped = $service->markShipped($order->number, 9);
+    $service->markShipped($order->number, 9);
+
+    expect($shipped?->status)->toBe(OrderStatus::Shipping)
+        ->and($shipped?->details()->pluck('status')->unique()->values()->all())->toBe([OrderStatus::Shipping]);
+
+    Event::assertDispatched(OrderShipped::class, 1);
+    expect(RecordingLifecycleHook::$events)->toBe([
+        ['event' => 'shipped', 'order_number' => '260510SHIP'],
+    ]);
+});
+
+it('marks orders as finished idempotently and dispatches fulfillment hooks once', function (): void {
+    RecordingLifecycleHook::reset();
+    Event::fake([OrderFinished::class]);
+    config()->set('commerce.lifecycle.hooks', [RecordingLifecycleHook::class]);
+
+    $service = app(OrderLifecycleService::class);
+    $product = Product::query()->create([
+        'title' => 'Finished course',
+        'type' => 1,
+        'list_price' => 1000,
+        'sales_price' => 1000,
+        'tax' => 1,
+    ]);
+    $order = $service->create(1, [['product_id' => $product->id]], ['number' => '260510DONE']);
+
+    $finished = $service->markFinished($order->number, 9);
+    $service->markFinished($order->number, 9);
+
+    expect($finished?->status)->toBe(OrderStatus::Finished)
+        ->and($finished?->payment_status)->toBe(PaymentStatus::Complete)
+        ->and($finished?->details()->pluck('status')->unique()->values()->all())->toBe([OrderStatus::Finished]);
+
+    Event::assertDispatched(OrderFinished::class, 1);
+    expect(RecordingLifecycleHook::$events)->toBe([
+        ['event' => 'finished', 'order_number' => '260510DONE'],
     ]);
 });
