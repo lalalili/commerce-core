@@ -298,6 +298,32 @@ it('marks orders as shipped idempotently and dispatches fulfillment hooks once',
     ]);
 });
 
+it('does not mark orders as shipped when the current status is not allowed', function (): void {
+    RecordingLifecycleHook::reset();
+    Event::fake([OrderShipped::class]);
+    config()->set('commerce.lifecycle.hooks', [RecordingLifecycleHook::class]);
+
+    $service = app(OrderLifecycleService::class);
+    $product = Product::query()->create([
+        'title' => 'Blocked shipped course',
+        'type' => 1,
+        'list_price' => 1000,
+        'sales_price' => 1000,
+        'tax' => 1,
+    ]);
+    $order = $service->create(1, [['product_id' => $product->id]], ['number' => '260510BLKS']);
+    $service->markFinished($order->number, 9);
+    RecordingLifecycleHook::reset();
+
+    $shipped = $service->markShipped($order->number, 9, [OrderStatus::Pending]);
+
+    expect($shipped?->status)->toBe(OrderStatus::Finished)
+        ->and($shipped?->shipping_at)->toBeNull();
+
+    Event::assertNotDispatched(OrderShipped::class);
+    expect(RecordingLifecycleHook::$events)->toBe([]);
+});
+
 it('marks orders as finished idempotently and dispatches fulfillment hooks once', function (): void {
     RecordingLifecycleHook::reset();
     Event::fake([OrderFinished::class]);

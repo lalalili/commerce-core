@@ -277,14 +277,17 @@ class OrderLifecycleService
         return $order;
     }
 
-    public function markShipped(string $orderNumber, int|string|null $updatedBy = null): ?Model
+    /**
+     * @param  list<mixed>  $allowedFromStatuses
+     */
+    public function markShipped(string $orderNumber, int|string|null $updatedBy = null, array $allowedFromStatuses = []): ?Model
     {
         /** @var class-string<Order> $orderModel */
         $orderModel = config('commerce.models.order', Order::class);
 
         $transitioned = false;
 
-        $order = DB::transaction(function () use ($orderNumber, $updatedBy, $orderModel, &$transitioned): ?Model {
+        $order = DB::transaction(function () use ($orderNumber, $updatedBy, $allowedFromStatuses, $orderModel, &$transitioned): ?Model {
             /** @var Model|null $order */
             $order = $orderModel::query()
                 ->where('number', $orderNumber)
@@ -296,6 +299,10 @@ class OrderLifecycleService
             }
 
             if ($this->statusEquals(data_get($order, 'status'), 'order.shipping')) {
+                return $order;
+            }
+
+            if ($allowedFromStatuses !== [] && ! $this->statusIn(data_get($order, 'status'), $allowedFromStatuses)) {
                 return $order;
             }
 
@@ -441,15 +448,32 @@ class OrderLifecycleService
     {
         $expected = $this->status($expectedKey);
 
-        if ($actual instanceof \BackedEnum) {
-            $actual = $actual->value;
+        return $this->normalizeStatusValue($actual) === $this->normalizeStatusValue($expected);
+    }
+
+    /**
+     * @param  list<mixed>  $expectedValues
+     */
+    private function statusIn(mixed $actual, array $expectedValues): bool
+    {
+        $actualValue = $this->normalizeStatusValue($actual);
+
+        foreach ($expectedValues as $expectedValue) {
+            if ($actualValue === $this->normalizeStatusValue($expectedValue)) {
+                return true;
+            }
         }
 
-        if ($expected instanceof \BackedEnum) {
-            $expected = $expected->value;
+        return false;
+    }
+
+    private function normalizeStatusValue(mixed $status): string
+    {
+        if ($status instanceof \BackedEnum) {
+            $status = $status->value;
         }
 
-        return (string) $actual === (string) $expected;
+        return (string) $status;
     }
 
     private function resolveItemNormalizer(): OrderItemNormalizer
