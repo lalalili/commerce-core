@@ -14,6 +14,7 @@ class PaymentApplicationService
         private readonly PaymentLogService $paymentLogs,
         private readonly OrderLifecycleService $orders,
         private readonly ModelAttributeMapper $attributes,
+        private readonly PaymentApplicationHookDispatcher $hooks,
     ) {}
 
     public function apply(PaymentApplicationData $payment, ?int $updatedBy = null): ?Model
@@ -28,10 +29,12 @@ class PaymentApplicationService
         $order = $this->findOrder($payment->orderNumber);
 
         if (! $order instanceof Model) {
+            $this->hooks->afterApplied($payment, null);
+
             return null;
         }
 
-        return match ($payment->outcome) {
+        $applied = match ($payment->outcome) {
             PaymentApplicationOutcome::Paid => $this->applyPaid($order, $payment, $updatedBy),
             PaymentApplicationOutcome::Refunded => $this->orders->markRefunded(
                 $payment->orderNumber,
@@ -40,6 +43,10 @@ class PaymentApplicationService
             ),
             default => $this->updatePaymentMessage($order, $payment->orderMessage()),
         };
+
+        $this->hooks->afterApplied($payment, $applied);
+
+        return $applied;
     }
 
     private function applyPaid(Model $order, PaymentApplicationData $payment, ?int $updatedBy): ?Model

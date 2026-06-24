@@ -48,6 +48,10 @@ return [
         'hooks' => [],
     ],
 
+    'payment' => [
+        'hooks' => [],
+    ],
+
     'columns' => [
         'products' => [
             'number' => 'number',

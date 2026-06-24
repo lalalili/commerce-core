@@ -10,6 +10,7 @@ use Lalalili\CommerceCore\Models\Product;
 use Lalalili\CommerceCore\Models\ProductUser;
 use Lalalili\CommerceCore\Services\OrderLifecycleService;
 use Lalalili\CommerceCore\Services\PaymentApplicationService;
+use Lalalili\CommerceCore\Tests\Support\RecordingPaymentApplicationHook;
 
 function createPaymentApplicationOrder(string $number = '260524APPL', int $amount = 1000): Order
 {
@@ -138,4 +139,50 @@ it('records query failures even when the order does not exist', function (): voi
     expect($applied)->toBeNull()
         ->and(PaymentLog::query()->where('order_number', '260524NONE')->where('status_message', '付款狀態查詢失敗')->exists())
         ->toBeTrue();
+});
+
+it('dispatches payment application hooks after applying a payment result', function (): void {
+    RecordingPaymentApplicationHook::reset();
+    config()->set('commerce.payment.hooks', [RecordingPaymentApplicationHook::class]);
+    $order = createPaymentApplicationOrder('260524HOOK', 1000);
+
+    app(PaymentApplicationService::class)->apply(new PaymentApplicationData(
+        orderNumber: $order->number,
+        outcome: PaymentApplicationOutcome::Paid,
+        payload: ['TradeStatus' => '1'],
+        statusCode: '1',
+        statusMessage: '訂單成立已付款',
+        amount: 1000,
+        paidAt: now(),
+        gatewayLabel: '綠界',
+    ));
+
+    expect(RecordingPaymentApplicationHook::$events)->toBe([
+        [
+            'outcome' => 'paid',
+            'order_number' => '260524HOOK',
+            'order_exists' => true,
+        ],
+    ]);
+});
+
+it('dispatches payment application hooks when the order does not exist', function (): void {
+    RecordingPaymentApplicationHook::reset();
+    config()->set('commerce.payment.hooks', [RecordingPaymentApplicationHook::class]);
+
+    app(PaymentApplicationService::class)->apply(new PaymentApplicationData(
+        orderNumber: '260524NOHK',
+        outcome: PaymentApplicationOutcome::QueryFailed,
+        payload: ['message' => '查詢失敗'],
+        statusCode: '',
+        statusMessage: '付款狀態查詢失敗',
+    ));
+
+    expect(RecordingPaymentApplicationHook::$events)->toBe([
+        [
+            'outcome' => 'query_failed',
+            'order_number' => '260524NOHK',
+            'order_exists' => false,
+        ],
+    ]);
 });
