@@ -10,6 +10,7 @@ Reusable product, order, invoice, payment log, and entitlement core for Laravel 
 - Configurable table names and column mappings for host compatibility.
 - Order creation, paid, shipped, finished, refunded, cancel, and tax grouping lifecycle services.
 - Payment log upsert helper for gateway reconciliation adapters.
+- Gateway-agnostic payment application service for applying normalized payment outcomes to orders.
 - Entitlement grant/revoke support through product-user records.
 - Host lifecycle hooks for project-specific side effects after paid, refunded, cancelled, shipped, or finished transitions.
 - Order number generation and attribute mapping helpers.
@@ -116,6 +117,25 @@ app(PaymentLogService::class)->record(
     statusCode: $statusCode,
     statusMessage: $statusMessage,
 );
+```
+
+Apply a normalized payment result:
+
+```php
+use Lalalili\CommerceCore\DTOs\PaymentApplicationData;
+use Lalalili\CommerceCore\Enums\PaymentApplicationOutcome;
+use Lalalili\CommerceCore\Services\PaymentApplicationService;
+
+app(PaymentApplicationService::class)->apply(new PaymentApplicationData(
+    orderNumber: $order->number,
+    outcome: PaymentApplicationOutcome::Paid,
+    payload: $gatewayPayload,
+    statusCode: $statusCode,
+    statusMessage: $statusMessage,
+    amount: $paidAmount,
+    paidAt: $paidAt,
+    gatewayLabel: 'ECPay',
+));
 ```
 
 Register host lifecycle hooks for project-specific side effects:

@@ -2,6 +2,17 @@
 
 All notable changes to `lalalili/commerce-core` are documented in this file.
 
+## [0.1.10] - 2026-06-24
+
+### Added
+
+- `PaymentApplicationData` and `PaymentApplicationOutcome` for gateway-agnostic payment result application.
+- `PaymentApplicationService::apply()` for recording payment logs, applying paid/refunded lifecycle transitions, handling amount mismatches, and updating payment status messages.
+
+### Compatibility
+
+- Additive; `commerce-core` does not depend on `commerce-payment`, and host applications can keep existing gateway adapters while delegating normalized payment outcomes to the new service.
+
 ## [0.1.9] - 2026-06-24
 
 ### Added
