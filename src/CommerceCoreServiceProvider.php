@@ -4,6 +4,7 @@ namespace Lalalili\CommerceCore;
 
 use Lalalili\CommerceCore\Services\CheckoutService;
 use Lalalili\CommerceCore\Services\CheckoutSnapshotService;
+use Lalalili\CommerceCore\Services\CouponEligibilityCartDataFactory;
 use Lalalili\CommerceCore\Services\EntitlementService;
 use Lalalili\CommerceCore\Services\OrderInitialStatusResolver;
 use Lalalili\CommerceCore\Services\OrderLifecycleHookDispatcher;
@@ -36,6 +37,7 @@ class CommerceCoreServiceProvider extends PackageServiceProvider
         $this->app->singleton(OrderNumberGenerator::class);
         $this->app->singleton(CheckoutService::class);
         $this->app->singleton(CheckoutSnapshotService::class);
+        $this->app->singleton(CouponEligibilityCartDataFactory::class);
         $this->app->singleton(EntitlementService::class);
         $this->app->singleton(OrderInitialStatusResolver::class);
         $this->app->singleton(OrderLifecycleHookDispatcher::class);
