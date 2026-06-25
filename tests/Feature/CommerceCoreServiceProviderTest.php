@@ -8,6 +8,7 @@ use Lalalili\CommerceCore\Services\CheckoutOrderBuilderService;
 use Lalalili\CommerceCore\Services\CheckoutOrderDataFactory;
 use Lalalili\CommerceCore\Services\CheckoutService;
 use Lalalili\CommerceCore\Services\CheckoutSnapshotService;
+use Lalalili\CommerceCore\Services\CouponCartConditionPayloadBuilder;
 use Lalalili\CommerceCore\Services\CouponCartPricingTraceService;
 use Lalalili\CommerceCore\Services\CouponCheckoutAdapterService;
 use Lalalili\CommerceCore\Services\CouponCodeGenerationPolicy;
@@ -48,6 +49,7 @@ it('registers reusable commerce services as singletons', function (string $abstr
     CheckoutOrderDataFactory::class,
     CheckoutService::class,
     CheckoutSnapshotService::class,
+    CouponCartConditionPayloadBuilder::class,
     CouponCartPricingTraceService::class,
     CouponCheckoutAdapterService::class,
     CouponCodeGenerationPolicy::class,
