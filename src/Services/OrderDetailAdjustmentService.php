@@ -2,8 +2,13 @@
 
 namespace Lalalili\CommerceCore\Services;
 
+use Illuminate\Database\Eloquent\Model;
+use Lalalili\CommerceCore\Support\ModelAttributeMapper;
+
 class OrderDetailAdjustmentService
 {
+    public function __construct(private readonly ModelAttributeMapper $attributes) {}
+
     /**
      * @return array<string, mixed>
      */
@@ -80,6 +85,43 @@ class OrderDetailAdjustmentService
     }
 
     /**
+     * @param  array<string, mixed>  $discountLine
+     * @param  array<string, mixed>|null  $shippingLine
+     * @param  array{details_relation?: string, discount_amount_key?: string, amount_key?: string}  $options
+     * @return list<array<string, mixed>>
+     */
+    public function orderAccountingDetails(
+        Model $order,
+        array $discountLine,
+        ?array $shippingLine = null,
+        mixed $shippingAmount = 0,
+        array $options = [],
+    ): array {
+        $detailsRelation = $this->detailsRelation($options);
+        $discountAmountKey = $options['discount_amount_key'] ?? 'total_discount_amt';
+        $amountKey = $options['amount_key'] ?? 'sales_price';
+
+        $order->loadMissing($detailsRelation);
+
+        $details = [];
+
+        foreach ($order->getRelationValue($detailsRelation) ?? [] as $detail) {
+            if ($detail instanceof Model) {
+                $details[] = $detail->toArray();
+            }
+        }
+
+        return $this->appendAccountingLines(
+            $details,
+            $this->attributes->value($order, 'orders', $discountAmountKey, 0),
+            $discountLine,
+            $shippingLine,
+            $shippingAmount,
+            $amountKey,
+        );
+    }
+
+    /**
      * @param  array<string, mixed>  $line
      * @return array<int|string, list<array<string, mixed>>>
      */
@@ -130,5 +172,15 @@ class OrderDetailAdjustmentService
         $line[$amountKey] = $amount;
 
         return $line;
+    }
+
+    /**
+     * @param  array{details_relation?: string}  $options
+     */
+    private function detailsRelation(array $options = []): string
+    {
+        $relation = $options['details_relation'] ?? config('commerce.relationships.order_details', 'details');
+
+        return is_string($relation) && $relation !== '' ? $relation : 'details';
     }
 }
