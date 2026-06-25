@@ -6,6 +6,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Lalalili\CommerceCore\DTOs\OrderCancellationResult;
 use Lalalili\CommerceCore\DTOs\OrderItemData;
 use Lalalili\CommerceCore\Events\OrderCancelled;
 use Lalalili\CommerceCore\Events\OrderCreated;
@@ -176,6 +177,24 @@ class OrderLifecycleService
         array $refundWhenOrderStatuses = [],
         ?array $cancelInvoiceStatuses = null,
     ): ?Model {
+        return $this->cancelWithResult(
+            $orderNumber,
+            $updatedBy,
+            $refundWhenOrderStatuses,
+            $cancelInvoiceStatuses,
+        )->order;
+    }
+
+    /**
+     * @param  list<mixed>  $refundWhenOrderStatuses
+     * @param  list<mixed>|null  $cancelInvoiceStatuses
+     */
+    public function cancelWithResult(
+        string $orderNumber,
+        int|string|null $updatedBy = null,
+        array $refundWhenOrderStatuses = [],
+        ?array $cancelInvoiceStatuses = null,
+    ): OrderCancellationResult {
         /** @var class-string<Order> $orderModel */
         $orderModel = config('commerce.models.order', Order::class);
 
@@ -244,7 +263,7 @@ class OrderLifecycleService
             }
         }
 
-        return $order;
+        return new OrderCancellationResult($order, $transitioned, $refunded);
     }
 
     public function markRefunded(

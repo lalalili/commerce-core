@@ -1,5 +1,6 @@
 <?php
 
+use Lalalili\CommerceCore\DTOs\OrderCancellationResult;
 use Lalalili\CommerceCore\Enums\InvoiceStatus;
 use Lalalili\CommerceCore\Enums\OrderStatus;
 use Lalalili\CommerceCore\Enums\PaymentStatus;
@@ -207,6 +208,30 @@ it('can treat configured order statuses as refundable when cancelling', function
         ['event' => 'cancelled', 'order_number' => '260510RFST'],
         ['event' => 'refunded', 'order_number' => '260510RFST'],
     ]);
+});
+
+it('reports cancellation transition and refund state', function (): void {
+    $service = app(OrderLifecycleService::class);
+    $product = Product::query()->create([
+        'title' => 'Cancellation result course',
+        'type' => 1,
+        'list_price' => 1000,
+        'sales_price' => 1000,
+        'tax' => 1,
+    ]);
+    $order = $service->create(1, [['product_id' => $product->id]], ['number' => '260510CRES']);
+    $service->markPaid($order->number, 'Succeeded', now());
+
+    $firstResult = $service->cancelWithResult($order->number);
+    $secondResult = $service->cancelWithResult($order->number);
+
+    expect($firstResult)->toBeInstanceOf(OrderCancellationResult::class)
+        ->and($firstResult->order?->status)->toBe(OrderStatus::Cancelled)
+        ->and($firstResult->transitioned)->toBeTrue()
+        ->and($firstResult->refunded)->toBeTrue()
+        ->and($secondResult->order?->status)->toBe(OrderStatus::Cancelled)
+        ->and($secondResult->transitioned)->toBeFalse()
+        ->and($secondResult->refunded)->toBeFalse();
 });
 
 it('runs cancellable lifecycle hooks before cancelling an order', function (): void {
