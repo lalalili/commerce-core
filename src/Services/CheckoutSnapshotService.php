@@ -187,7 +187,7 @@ class CheckoutSnapshotService
 
     /**
      * @param  list<array<string, mixed>>  $lineSnapshots
-     * @param  array<string, array{source?:string, type?:string, default?:mixed}>  $schema
+     * @param  array<string, array{source?:string, type?:'array'|'bool'|'datetime'|'float'|'int'|'json'|'raw'|'string', default?:mixed}>  $schema
      * @return list<array<string, mixed>>
      */
     public function normalizeLineSnapshots(array $lineSnapshots, array $schema): array
@@ -196,6 +196,32 @@ class CheckoutSnapshotService
             ->map(fn (array $lineSnapshot): array => $this->normalizeLineSnapshot($lineSnapshot, $schema))
             ->values()
             ->all());
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $lineSnapshots
+     * @param  array<string, array{source?:string, type?:'array'|'bool'|'datetime'|'float'|'int'|'json'|'raw'|'string', default?:mixed}>  $schema
+     * @param  array<string, mixed>  $base
+     * @return list<array<string, mixed>>
+     */
+    public function orderDetailRows(
+        array $lineSnapshots,
+        array $schema,
+        array $base = [],
+        string $productKey = 'product_id',
+        string $quantityKey = 'quantity',
+    ): array {
+        $rows = [];
+
+        foreach ($lineSnapshots as $lineSnapshot) {
+            if ((string) ($lineSnapshot[$productKey] ?? '') === '' || (int) ($lineSnapshot[$quantityKey] ?? 0) < 1) {
+                continue;
+            }
+
+            $rows[] = array_merge($base, $this->normalizeLineSnapshot($lineSnapshot, $schema));
+        }
+
+        return $rows;
     }
 
     /**
@@ -239,7 +265,7 @@ class CheckoutSnapshotService
 
     /**
      * @param  array<string, mixed>  $lineSnapshot
-     * @param  array<string, array{source?:string, type?:string, default?:mixed}>  $schema
+     * @param  array<string, array{source?:string, type?:'array'|'bool'|'datetime'|'float'|'int'|'json'|'raw'|'string', default?:mixed}>  $schema
      * @return array<string, mixed>
      */
     private function normalizeLineSnapshot(array $lineSnapshot, array $schema): array
@@ -272,8 +298,24 @@ class CheckoutSnapshotService
             'float' => (float) ($value ?? $default ?? 0),
             'bool' => (bool) ($value ?? $default ?? false),
             'array' => is_array($value) ? $value : (is_array($default) ? $default : []),
+            'json' => $this->jsonValue($value, $default),
             default => $value,
         };
+    }
+
+    private function jsonValue(mixed $value, mixed $default): string
+    {
+        if ($value instanceof Collection) {
+            $value = $value->all();
+        }
+
+        $payload = is_array($value) ? $value : (is_array($default) ? $default : []);
+
+        try {
+            return json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        } catch (Throwable) {
+            return '[]';
+        }
     }
 
     /**

@@ -143,6 +143,124 @@ it('extracts reusable cart line values for host line builders', function (): voi
         ->and($service->enumValue(CheckoutSnapshotFakeProductType::Course))->toBe(3);
 });
 
+it('builds order detail rows from host schemas', function (): void {
+    $service = app(CheckoutSnapshotService::class);
+
+    $lineSnapshots = [
+        [
+            'product_number' => 'P001',
+            'product_title' => 'Course',
+            'quantity' => '2',
+            'list_price' => '1000',
+            'sales_price' => '850',
+            'is_preorder' => true,
+            'preorder_release_at' => '2026-07-01',
+            'event_id' => [11, 12],
+            'event_title' => ['夏季活動', 'Bundle'],
+        ],
+        [
+            'product_number' => '',
+            'product_title' => 'Skipped',
+            'quantity' => 1,
+        ],
+        [
+            'product_number' => 'P003',
+            'product_title' => 'Zero quantity',
+            'quantity' => 0,
+        ],
+    ];
+
+    $rows = $service->orderDetailRows(
+        $lineSnapshots,
+        [
+            'product_number' => ['type' => 'string', 'default' => ''],
+            'product_title' => ['type' => 'string', 'default' => ''],
+            'qty' => ['source' => 'quantity', 'type' => 'int', 'default' => 0],
+            'list_price' => ['type' => 'raw', 'default' => 0],
+            'sales_price' => ['type' => 'raw', 'default' => 0],
+            'is_preorder' => ['type' => 'bool', 'default' => false],
+            'preorder_release_at' => ['type' => 'raw', 'default' => null],
+            'event_id' => ['type' => 'json', 'default' => []],
+            'event_title' => ['type' => 'json', 'default' => []],
+        ],
+        [
+            'order_id' => 99,
+            'order_number' => 'O-001',
+            'created_by' => 5,
+            'created_at' => '2026-06-25 10:00:00',
+            'updated_at' => '2026-06-25 10:00:00',
+        ],
+        productKey: 'product_number',
+    );
+
+    expect($rows)->toBe([
+        [
+            'order_id' => 99,
+            'order_number' => 'O-001',
+            'created_by' => 5,
+            'created_at' => '2026-06-25 10:00:00',
+            'updated_at' => '2026-06-25 10:00:00',
+            'product_number' => 'P001',
+            'product_title' => 'Course',
+            'qty' => 2,
+            'list_price' => '1000',
+            'sales_price' => '850',
+            'is_preorder' => true,
+            'preorder_release_at' => '2026-07-01',
+            'event_id' => '[11,12]',
+            'event_title' => '["夏季活動","Bundle"]',
+        ],
+    ]);
+});
+
+it('keeps array values in order detail rows when the host schema requires arrays', function (): void {
+    $service = app(CheckoutSnapshotService::class);
+
+    $rows = $service->orderDetailRows([
+        [
+            'product_id' => 10,
+            'product_type' => CheckoutSnapshotFakeProductType::Course->value,
+            'company_id' => 3,
+            'title' => 'Course',
+            'quantity' => 1,
+            'list_price' => 1200,
+            'sales_price' => 1000,
+            'event_id' => [11],
+            'event_title' => ['Launch'],
+        ],
+    ], [
+        'product_id' => ['type' => 'raw', 'default' => null],
+        'product_type' => ['type' => 'raw', 'default' => null],
+        'company_id' => ['type' => 'raw', 'default' => null],
+        'title' => ['type' => 'string', 'default' => ''],
+        'qty' => ['source' => 'quantity', 'type' => 'int', 'default' => 0],
+        'list_price' => ['type' => 'raw', 'default' => 0],
+        'sales_price' => ['type' => 'raw', 'default' => 0],
+        'event_id' => ['type' => 'array', 'default' => []],
+        'event_title' => ['type' => 'array', 'default' => []],
+    ], [
+        'order_id' => 99,
+        'order_number' => 'O-001',
+    ]);
+
+    expect($rows)->toBe([
+        [
+            'order_id' => 99,
+            'order_number' => 'O-001',
+            'product_id' => 10,
+            'product_type' => 3,
+            'company_id' => 3,
+            'title' => 'Course',
+            'qty' => 1,
+            'list_price' => 1200,
+            'sales_price' => 1000,
+            'event_id' => [11],
+            'event_title' => ['Launch'],
+        ],
+    ])
+        ->and($service->detailTotal($rows, 'list_price', 'qty'))->toBe(1200);
+});
+
 class CheckoutSnapshotFakeCart
 {
     public function __construct(
