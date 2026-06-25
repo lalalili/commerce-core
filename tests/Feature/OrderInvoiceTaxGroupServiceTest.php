@@ -37,6 +37,26 @@ it('normalizes order details by tax group', function (): void {
     ]);
 });
 
+it('normalizes tax group keys without changing detail payloads', function (): void {
+    $service = app(OrderInvoiceTaxGroupService::class);
+
+    expect($service->normalizeTaxGroupKeys([
+        '2' => [
+            ['product_number' => 'A', 'sales_price' => '100'],
+        ],
+        '0' => [
+            ['product_number' => 'B', 'meta' => ['gift' => true]],
+        ],
+    ]))->toBe([
+        0 => [
+            ['product_number' => 'B', 'meta' => ['gift' => true]],
+        ],
+        2 => [
+            ['product_number' => 'A', 'sales_price' => '100'],
+        ],
+    ]);
+});
+
 it('groups order details by tax bucket and splits discounts by taxable amount', function (): void {
     $service = app(OrderInvoiceTaxGroupService::class);
 

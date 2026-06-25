@@ -55,6 +55,25 @@ class OrderInvoiceTaxGroupService
     }
 
     /**
+     * @template T of array<string, mixed>
+     *
+     * @param  array<int|string, list<T>>  $groups
+     * @return array<int, list<T>>
+     */
+    public function normalizeTaxGroupKeys(array $groups): array
+    {
+        $normalized = [];
+
+        foreach ($groups as $taxType => $details) {
+            $normalized[(int) $taxType] = $details;
+        }
+
+        ksort($normalized);
+
+        return $normalized;
+    }
+
+    /**
      * @param  list<array{detail: array<string, mixed>, tax_type: int|string, taxable_amount?: mixed}>  $items
      * @param  array<string, mixed>  $discountLine
      * @param  array{shipping_line?: array<string, mixed>|null, shipping_amount?: mixed, force_tax_type?: int|string|null, taxable_key?: int|string, tax_free_key?: int|string, amount_key?: string}  $options
