@@ -206,10 +206,12 @@ class CheckoutSnapshotService
     }
 
     /**
+     * @template TCartLineSnapshot of array<string, mixed>
+     *
      * @param  iterable<int, mixed>|mixed  $cartContent
-     * @param  callable(mixed, array{id:string,title:string,decoded_title:string,quantity:int,list_price:string,sales_price:string,condition_attributes:array<string, list<mixed>>}, self): (array<string, mixed>|null)  $mapper
+     * @param  callable(mixed, array{id:string,title:string,decoded_title:string,quantity:int,list_price:string,sales_price:string,condition_attributes:array<string, list<mixed>>}, self=): (TCartLineSnapshot|null)  $mapper
      * @param  list<string>  $conditionAttributeKeys
-     * @return list<array<string, mixed>>
+     * @return list<TCartLineSnapshot>
      */
     public function cartLineSnapshots(
         mixed $cartContent,
