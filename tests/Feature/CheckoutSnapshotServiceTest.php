@@ -261,6 +261,52 @@ it('keeps array values in order detail rows when the host schema requires arrays
         ->and($service->detailTotal($rows, 'list_price', 'qty'))->toBe(1200);
 });
 
+it('summarizes preorder line snapshots for host order payloads', function (): void {
+    $service = app(CheckoutSnapshotService::class);
+    $earlyRelease = now()->setDate(2026, 8, 1)->setTime(10, 0);
+    $lateRelease = now()->setDate(2026, 9, 1)->setTime(10, 0);
+
+    $summary = $service->preorderSummary([
+        [
+            'is_preorder' => false,
+            'preorder_release_at' => $lateRelease,
+        ],
+        [
+            'is_preorder' => true,
+            'preorder_release_at' => $earlyRelease,
+        ],
+        [
+            'is_preorder' => true,
+            'preorder_release_at' => $lateRelease,
+        ],
+        [
+            'is_preorder' => true,
+            'preorder_release_at' => 'not-a-date',
+        ],
+    ]);
+
+    expect($summary)->toBe([
+        'has_preorder' => true,
+        'preorder_hold_until' => $lateRelease,
+    ])
+        ->and($service->preorderSummary([]))->toBe([
+            'has_preorder' => false,
+            'preorder_hold_until' => null,
+        ]);
+});
+
+it('builds condition discount notes for host order notes', function (): void {
+    $service = app(CheckoutSnapshotService::class);
+
+    $notes = $service->conditionDiscountNotes(new Collection([
+        new CheckoutSnapshotFakeCondition('Launch', 'rebate', '-100', []),
+        new CheckoutSnapshotFakeCondition('Bundle', 'rebate', '-50.5', []),
+    ]));
+
+    expect($notes)->toBe('活動類折扣:Launch-$100,活動類折扣:Bundle-$50.5,')
+        ->and($service->conditionDiscountNotes(null))->toBe('');
+});
+
 it('builds reusable checkout snapshot persistence attributes', function (): void {
     $service = app(CheckoutSnapshotService::class);
     $capturedAt = now()->setDate(2026, 6, 25)->setTime(10, 30);

@@ -235,6 +235,60 @@ class CheckoutSnapshotService
 
     /**
      * @param  list<array<string, mixed>>  $lineSnapshots
+     * @return array{has_preorder: bool, preorder_hold_until: CarbonInterface|null}
+     */
+    public function preorderSummary(
+        array $lineSnapshots,
+        string $isPreorderKey = 'is_preorder',
+        string $releaseAtKey = 'preorder_release_at',
+    ): array {
+        $hasPreorder = false;
+        $holdUntil = null;
+
+        foreach ($lineSnapshots as $lineSnapshot) {
+            if (! ($lineSnapshot[$isPreorderKey] ?? false)) {
+                continue;
+            }
+
+            $hasPreorder = true;
+
+            $releaseAt = $lineSnapshot[$releaseAtKey] ?? null;
+            if (! $releaseAt instanceof CarbonInterface) {
+                continue;
+            }
+
+            if (! $holdUntil instanceof CarbonInterface || $releaseAt->gt($holdUntil)) {
+                $holdUntil = $releaseAt;
+            }
+        }
+
+        return [
+            'has_preorder' => $hasPreorder,
+            'preorder_hold_until' => $holdUntil,
+        ];
+    }
+
+    public function conditionDiscountNotes(
+        mixed $conditions,
+        string $prefix = '活動類折扣:',
+        string $amountPrefix = '-$',
+        string $separator = ',',
+    ): string {
+        $notes = '';
+
+        foreach ($this->normalizeConditions($conditions) as $condition) {
+            if (! is_object($condition) || ! method_exists($condition, 'getName') || ! method_exists($condition, 'getValue')) {
+                continue;
+            }
+
+            $notes .= $prefix.$condition->getName().$amountPrefix.((float) $condition->getValue() * -1).$separator;
+        }
+
+        return $notes;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $lineSnapshots
      * @param  array<string, mixed>  $cartSnapshot
      * @param  array<string, mixed>  $payload
      * @param  array<string, mixed>  $extra
