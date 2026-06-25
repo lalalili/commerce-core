@@ -312,7 +312,10 @@ class OrderLifecycleService
                 return null;
             }
 
-            if ($this->statusEquals(data_get($order, 'status'), 'order.shipping')) {
+            if (
+                $this->statusEquals(data_get($order, 'status'), 'order.shipping')
+                && data_get($order, 'shipping_at') !== null
+            ) {
                 return $order;
             }
 

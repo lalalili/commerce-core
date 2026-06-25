@@ -420,6 +420,37 @@ it('marks orders as shipped idempotently and dispatches fulfillment hooks once',
     ]);
 });
 
+it('marks orders as shipped when paid and shipping share the same host status', function (): void {
+    RecordingLifecycleHook::reset();
+    Event::fake([OrderShipped::class]);
+    config()->set('commerce.lifecycle.hooks', [RecordingLifecycleHook::class]);
+    config()->set('commerce.statuses.order.shipping', OrderStatus::Complete);
+
+    $service = app(OrderLifecycleService::class);
+    $product = Product::query()->create([
+        'title' => 'Digital shipped course',
+        'type' => 1,
+        'list_price' => 1000,
+        'sales_price' => 1000,
+        'tax' => 1,
+    ]);
+    $order = $service->create(1, [['product_id' => $product->id]], ['number' => '260510DSHP']);
+    $service->markPaid($order->number, 'Succeeded', now());
+    RecordingLifecycleHook::reset();
+
+    $shipped = $service->markShipped($order->number, 9);
+    $service->markShipped($order->number, 9);
+
+    expect($shipped?->status)->toBe(OrderStatus::Complete)
+        ->and($shipped?->shipping_at)->not->toBeNull()
+        ->and($shipped?->details()->pluck('status')->unique()->values()->all())->toBe([OrderStatus::Complete]);
+
+    Event::assertDispatched(OrderShipped::class, 1);
+    expect(RecordingLifecycleHook::$events)->toBe([
+        ['event' => 'shipped', 'order_number' => '260510DSHP'],
+    ]);
+});
+
 it('does not mark orders as shipped when the current status is not allowed', function (): void {
     RecordingLifecycleHook::reset();
     Event::fake([OrderShipped::class]);
