@@ -659,9 +659,7 @@ class CheckoutSnapshotService
         array $lineSnapshotSchema,
         array $options = [],
     ): array {
-        if (! is_subclass_of($snapshotModel, Model::class)) {
-            throw new InvalidArgumentException('Snapshot model must extend '.Model::class.'.');
-        }
+        $this->assertSnapshotModel($snapshotModel);
 
         $record = $this->checkoutSuccessSnapshotRecord(
             request: $request,
@@ -683,6 +681,85 @@ class CheckoutSnapshotService
         );
 
         return $record;
+    }
+
+    /**
+     * @param  class-string<Model>  $snapshotModel
+     */
+    public function staleCheckoutSnapshotCount(
+        string $snapshotModel,
+        CarbonInterface $cutoff,
+        string $capturedAtColumn = 'captured_at',
+    ): int {
+        $this->assertSnapshotModel($snapshotModel);
+
+        return (int) $snapshotModel::query()
+            ->where($capturedAtColumn, '<', $cutoff)
+            ->count();
+    }
+
+    /**
+     * @param  class-string<Model>  $snapshotModel
+     * @return array{
+     *     candidate_count: int,
+     *     deleted_count: int,
+     *     stalled: bool,
+     *     stalled_candidate_ids: list<mixed>,
+     *     stalled_candidate_id_count: int
+     * }
+     */
+    public function pruneCheckoutSnapshotRecords(
+        string $snapshotModel,
+        CarbonInterface $cutoff,
+        int $batch = 1000,
+        string $capturedAtColumn = 'captured_at',
+        string $keyColumn = 'id',
+    ): array {
+        $this->assertSnapshotModel($snapshotModel);
+
+        if ($batch < 1) {
+            throw new InvalidArgumentException('Snapshot prune batch must be greater than or equal to 1.');
+        }
+
+        $candidateCount = $this->staleCheckoutSnapshotCount($snapshotModel, $cutoff, $capturedAtColumn);
+        $deletedCount = 0;
+
+        while (true) {
+            $ids = $snapshotModel::query()
+                ->where($capturedAtColumn, '<', $cutoff)
+                ->orderBy($capturedAtColumn)
+                ->limit($batch)
+                ->pluck($keyColumn);
+
+            if ($ids->isEmpty()) {
+                break;
+            }
+
+            $deleteBatchIds = $ids->values()->all();
+            $deletedInBatch = $snapshotModel::query()
+                ->whereIn($keyColumn, $deleteBatchIds)
+                ->delete();
+
+            if ($deletedInBatch < 1) {
+                return [
+                    'candidate_count' => $candidateCount,
+                    'deleted_count' => $deletedCount,
+                    'stalled' => true,
+                    'stalled_candidate_ids' => array_slice($deleteBatchIds, 0, 5),
+                    'stalled_candidate_id_count' => count($deleteBatchIds),
+                ];
+            }
+
+            $deletedCount += $deletedInBatch;
+        }
+
+        return [
+            'candidate_count' => $candidateCount,
+            'deleted_count' => $deletedCount,
+            'stalled' => false,
+            'stalled_candidate_ids' => [],
+            'stalled_candidate_id_count' => 0,
+        ];
     }
 
     /**
@@ -978,6 +1055,16 @@ class CheckoutSnapshotService
         }
 
         return array_intersect_key($value, array_flip($keys));
+    }
+
+    /**
+     * @param  class-string<Model>  $snapshotModel
+     */
+    private function assertSnapshotModel(string $snapshotModel): void
+    {
+        if (! is_subclass_of($snapshotModel, Model::class)) {
+            throw new InvalidArgumentException('Snapshot model must extend '.Model::class.'.');
+        }
     }
 
     private function sortRecursive(mixed $value): mixed

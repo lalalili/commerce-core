@@ -1026,6 +1026,50 @@ it('persists reusable checkout success snapshot records through a host model', f
         ]);
 });
 
+it('prunes stale checkout snapshot records through a host model', function (): void {
+    Schema::create('checkout_snapshot_prune_test_records', function (Blueprint $table): void {
+        $table->id();
+        $table->string('order_number')->unique();
+        $table->timestamp('captured_at')->nullable();
+        $table->timestamps();
+    });
+
+    $old = CheckoutSnapshotPruneTestRecord::query()->create([
+        'order_number' => 'O-OLD-1',
+        'captured_at' => now()->subDays(181),
+    ]);
+    $older = CheckoutSnapshotPruneTestRecord::query()->create([
+        'order_number' => 'O-OLD-2',
+        'captured_at' => now()->subDays(190),
+    ]);
+    $recent = CheckoutSnapshotPruneTestRecord::query()->create([
+        'order_number' => 'O-RECENT',
+        'captured_at' => now()->subDays(30),
+    ]);
+
+    $service = app(CheckoutSnapshotService::class);
+    $cutoff = now()->subDays(180);
+
+    expect($service->staleCheckoutSnapshotCount(CheckoutSnapshotPruneTestRecord::class, $cutoff))->toBe(2);
+
+    $result = $service->pruneCheckoutSnapshotRecords(
+        snapshotModel: CheckoutSnapshotPruneTestRecord::class,
+        cutoff: $cutoff,
+        batch: 1,
+    );
+
+    expect($result)->toBe([
+        'candidate_count' => 2,
+        'deleted_count' => 2,
+        'stalled' => false,
+        'stalled_candidate_ids' => [],
+        'stalled_candidate_id_count' => 0,
+    ])
+        ->and(CheckoutSnapshotPruneTestRecord::query()->whereKey($older->id)->exists())->toBeFalse()
+        ->and(CheckoutSnapshotPruneTestRecord::query()->whereKey($old->id)->exists())->toBeFalse()
+        ->and(CheckoutSnapshotPruneTestRecord::query()->whereKey($recent->id)->exists())->toBeTrue();
+});
+
 class CheckoutSnapshotFakeCart
 {
     public function __construct(
@@ -1159,4 +1203,11 @@ class CheckoutSnapshotTestRecord extends Model
             'payload' => 'array',
         ];
     }
+}
+
+class CheckoutSnapshotPruneTestRecord extends Model
+{
+    protected $guarded = [];
+
+    protected $table = 'checkout_snapshot_prune_test_records';
 }
