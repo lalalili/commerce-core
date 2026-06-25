@@ -45,6 +45,8 @@ it('reads scalar response values from successful payment logs', function (): voi
 
     expect($service->responseValue('260510CARD', 'DATA.txnData.AN', [0, 11]))
         ->toBe('1234-5678')
+        ->and($service->creditCardNumber('260510CARD'))
+        ->toBe('1234-5678')
         ->and($service->responseValue('260510CARD', 'DATA.txnData.MISSING', [0, 11]))
         ->toBe('');
 });

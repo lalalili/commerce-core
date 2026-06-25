@@ -63,6 +63,17 @@ class PaymentLogService
     }
 
     /**
+     * @param  list<mixed>  $successfulStatusCodes
+     */
+    public function creditCardNumber(
+        string $orderNumber,
+        string $responsePath = 'DATA.txnData.AN',
+        array $successfulStatusCodes = [0, 11],
+    ): string {
+        return $this->responseValue($orderNumber, $responsePath, $successfulStatusCodes);
+    }
+
+    /**
      * @return class-string<Model>
      */
     private function paymentLogModel(): string
