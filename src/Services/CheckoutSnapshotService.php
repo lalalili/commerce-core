@@ -142,7 +142,7 @@ class CheckoutSnapshotService
     }
 
     /**
-     * @param  list<array<string, mixed>>  $lineSnapshots
+     * @param  array<int, array<string, mixed>>  $lineSnapshots
      * @param  iterable<int, mixed>|mixed  $cartContent
      */
     public function hasCompleteLineSnapshots(array $lineSnapshots, mixed $cartContent): bool
@@ -274,7 +274,17 @@ class CheckoutSnapshotService
     }
 
     /**
-     * @param  list<array<string, mixed>>  $lineSnapshots
+     * @param  array<string, mixed>  $snapshot
+     * @param  array<string, array{source?:string, type?:'array'|'bool'|'datetime'|'float'|'int'|'json'|'raw'|'string', default?:mixed}|string>  $schema
+     * @return array<string, mixed>
+     */
+    public function normalizeSnapshot(array $snapshot, array $schema): array
+    {
+        return $this->normalizeLineSnapshot($snapshot, $this->normalizeSnapshotSchema($schema));
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $lineSnapshots
      * @param  array<string, array{source?:string, type?:'array'|'bool'|'datetime'|'float'|'int'|'json'|'raw'|'string', default?:mixed}>  $schema
      * @param  array<string, mixed>  $base
      * @return list<array<string, mixed>>
@@ -392,6 +402,99 @@ class CheckoutSnapshotService
             'payload_hash' => $this->hashPayload($payload),
             'captured_at' => $capturedAt,
         ], $extra);
+    }
+
+    /**
+     * @param  array<string, mixed>  $order
+     * @param  array<int, array<string, mixed>>  $lineSnapshots
+     * @param  array<string, array{source?:string, type?:'array'|'bool'|'datetime'|'float'|'int'|'json'|'raw'|'string', default?:mixed}|string>  $orderSchema
+     * @param  array<string, array{source?:string, type?:'array'|'bool'|'datetime'|'float'|'int'|'json'|'raw'|'string', default?:mixed}|string>  $requestSchema
+     * @param  array<string, array{source?:string, type?:'array'|'bool'|'datetime'|'float'|'int'|'json'|'raw'|'string', default?:mixed}>  $lineSnapshotSchema
+     * @param  array{
+     *     cart_item_attribute_keys?: list<string>,
+     *     condition_attribute_keys?: list<string>,
+     *     order_request_schema?: array<string, array{source?:string, type?:'array'|'bool'|'datetime'|'float'|'int'|'json'|'raw'|'string', default?:mixed, filled?:bool}|string>,
+     *     attribute_extra?: array<string, mixed>,
+     *     payload_extra?: array<string, mixed>,
+     *     snapshot_version?: int,
+     *     detail_total?: int,
+     *     order_number_key?: string,
+     *     order_number?: string
+     * }  $options
+     * @return array{
+     *     lookup: array{order_number: string},
+     *     attributes: array<string, mixed>,
+     *     payload: array<string, mixed>,
+     *     cart_snapshot: array<string, mixed>,
+     *     line_snapshots: list<array<string, mixed>>,
+     *     detail_total: int
+     * }
+     */
+    public function checkoutSuccessSnapshotRecord(
+        mixed $request,
+        mixed $cart,
+        array $order,
+        int $orderId,
+        ?int $userId,
+        array $lineSnapshots,
+        CarbonInterface $capturedAt,
+        array $orderSchema,
+        array $requestSchema,
+        array $lineSnapshotSchema,
+        array $options = [],
+    ): array {
+        $lineSnapshots = array_values($lineSnapshots);
+        $cartSnapshot = $this->captureCart(
+            $cart,
+            $options['cart_item_attribute_keys'] ?? [],
+            $options['condition_attribute_keys'] ?? self::DEFAULT_CONDITION_ATTRIBUTE_KEYS,
+        );
+        $normalizedLineSnapshots = $this->normalizeLineSnapshots($lineSnapshots, $lineSnapshotSchema);
+        $detailTotal = $options['detail_total'] ?? $this->detailTotal($lineSnapshots);
+        $snapshotVersion = $options['snapshot_version'] ?? 1;
+        $orderNumberKey = $options['order_number_key'] ?? 'number';
+        $orderNumber = (string) ($options['order_number'] ?? $order[$orderNumberKey] ?? '');
+
+        $orderSnapshot = array_merge([
+            'id' => $orderId,
+            'user_id' => $userId,
+        ], $this->normalizeSnapshot($order, $orderSchema));
+
+        if (isset($options['order_request_schema'])) {
+            $orderSnapshot = array_merge($orderSnapshot, $this->requestSnapshot($request, $options['order_request_schema']));
+        }
+
+        $payload = $this->checkoutSuccessPayload(
+            orderSnapshot: $orderSnapshot,
+            requestSnapshot: $this->requestSnapshot($request, $requestSchema),
+            cartSnapshot: $cartSnapshot,
+            lineSnapshots: $normalizedLineSnapshots,
+            detailTotal: $detailTotal,
+            capturedAt: $capturedAt,
+            snapshotVersion: $snapshotVersion,
+            extra: $options['payload_extra'] ?? [],
+        );
+
+        return [
+            'lookup' => [
+                'order_number' => $orderNumber,
+            ],
+            'attributes' => $this->checkoutSnapshotAttributes(
+                orderId: $orderId,
+                userId: $userId,
+                lineSnapshots: $lineSnapshots,
+                cartSnapshot: $cartSnapshot,
+                payload: $payload,
+                capturedAt: $capturedAt,
+                snapshotVersion: $snapshotVersion,
+                detailTotal: $detailTotal,
+                extra: $options['attribute_extra'] ?? [],
+            ),
+            'payload' => $payload,
+            'cart_snapshot' => $cartSnapshot,
+            'line_snapshots' => $normalizedLineSnapshots,
+            'detail_total' => $detailTotal,
+        ];
     }
 
     /**
@@ -514,6 +617,34 @@ class CheckoutSnapshotService
         } catch (Throwable) {
             return $default;
         }
+    }
+
+    /**
+     * @param  array<int|string, array{source?:string, type?:'array'|'bool'|'datetime'|'float'|'int'|'json'|'raw'|'string', default?:mixed}|string>  $schema
+     * @return array<string, array{source?:string, type?:'array'|'bool'|'datetime'|'float'|'int'|'json'|'raw'|'string', default?:mixed}>
+     */
+    private function normalizeSnapshotSchema(array $schema): array
+    {
+        $normalized = [];
+
+        foreach ($schema as $outputKey => $definition) {
+            if (is_int($outputKey)) {
+                if (! is_string($definition)) {
+                    continue;
+                }
+
+                $outputKey = (string) $definition;
+                $definition = [];
+            }
+
+            if (is_string($definition)) {
+                $definition = ['source' => $definition];
+            }
+
+            $normalized[(string) $outputKey] = $definition;
+        }
+
+        return $normalized;
     }
 
     /**

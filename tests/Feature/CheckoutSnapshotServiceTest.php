@@ -551,6 +551,113 @@ it('builds request snapshots from host supplied field schemas', function (): voi
         ]);
 });
 
+it('builds reusable checkout success snapshot records', function (): void {
+    $service = app(CheckoutSnapshotService::class);
+    $capturedAt = now()->setDate(2026, 6, 25)->setTime(12, 5);
+    $request = new CheckoutSnapshotFakeRequest([
+        'pay_type' => 'credit_card',
+        'member_coupon_code' => 'MEMBER10',
+    ]);
+    $cart = new CheckoutSnapshotFakeCart(
+        items: [
+            new CheckoutSnapshotFakeItem(
+                id: 'P001',
+                name: 'Test Product',
+                price: 500,
+                quantity: 2,
+                attributes: ['prod_no' => 'P001', 'ignored' => 'value'],
+                conditions: [],
+            ),
+        ],
+        conditions: [],
+        subtotal: 1000,
+        total: 900,
+    );
+
+    $record = $service->checkoutSuccessSnapshotRecord(
+        request: $request,
+        cart: $cart,
+        order: [
+            'number' => 'O-001',
+            'total_sales_price' => '900',
+            'total_discount_amt' => '100',
+            'payment_type' => 'credit_card',
+            'submission_id' => 'SUB-1',
+        ],
+        orderId: 99,
+        userId: 5,
+        lineSnapshots: [
+            [
+                'product_number' => 'P001',
+                'quantity' => 2,
+                'sales_price' => '450',
+            ],
+        ],
+        capturedAt: $capturedAt,
+        orderSchema: [
+            'number',
+            'submission_id',
+            'total_sales_price',
+            'total_discount_amt',
+            'payment_type',
+        ],
+        requestSchema: [
+            'payment_type' => 'pay_type',
+        ],
+        lineSnapshotSchema: [
+            'product_number' => ['type' => 'string', 'default' => ''],
+            'quantity' => ['type' => 'int', 'default' => 0],
+            'sales_price' => ['type' => 'string', 'default' => ''],
+        ],
+        options: [
+            'cart_item_attribute_keys' => ['prod_no'],
+            'order_request_schema' => [
+                'member_coupon_code',
+            ],
+            'attribute_extra' => [
+                'submission_id' => 'SUB-1',
+            ],
+            'payload_extra' => [
+                'source' => 'checkout',
+            ],
+        ],
+    );
+
+    expect($record['lookup'])->toBe([
+        'order_number' => 'O-001',
+    ])
+        ->and($record['detail_total'])->toBe(900)
+        ->and($record['line_snapshots'])->toBe([
+            [
+                'product_number' => 'P001',
+                'quantity' => 2,
+                'sales_price' => '450',
+            ],
+        ])
+        ->and($record['payload']['order'])->toBe([
+            'id' => 99,
+            'user_id' => 5,
+            'number' => 'O-001',
+            'submission_id' => 'SUB-1',
+            'total_sales_price' => '900',
+            'total_discount_amt' => '100',
+            'payment_type' => 'credit_card',
+            'member_coupon_code' => 'MEMBER10',
+        ])
+        ->and($record['payload']['request'])->toBe([
+            'payment_type' => 'credit_card',
+        ])
+        ->and($record['payload']['source'])->toBe('checkout')
+        ->and($record['attributes']['order_id'])->toBe(99)
+        ->and($record['attributes']['user_id'])->toBe(5)
+        ->and($record['attributes']['line_count'])->toBe(1)
+        ->and($record['attributes']['detail_total'])->toBe(900)
+        ->and($record['attributes']['submission_id'])->toBe('SUB-1')
+        ->and($record['cart_snapshot']['items'][0]['attributes'])->toBe([
+            'prod_no' => 'P001',
+        ]);
+});
+
 class CheckoutSnapshotFakeCart
 {
     public function __construct(
