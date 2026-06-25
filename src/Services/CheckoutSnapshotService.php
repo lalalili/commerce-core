@@ -180,6 +180,42 @@ class CheckoutSnapshotService
         return number_format((float) ($this->numericValue($value) ?? 0), 0, '.', '');
     }
 
+    /**
+     * @return array{total_sales_price:int|string,total_discount_amt:int|string}
+     */
+    public function checkoutTotals(mixed $cart, bool $stringValues = false): array
+    {
+        $totalSalesPrice = $this->numericCartValue(fn (): mixed => $cart->getTotal(false)) ?? 0;
+        $totalDiscountAmount = ($this->numericCartValue(fn (): mixed => $cart->getSubTotal(false)) ?? 0) - $totalSalesPrice;
+
+        if ($stringValues) {
+            return [
+                'total_sales_price' => $this->moneyString($totalSalesPrice),
+                'total_discount_amt' => $this->moneyString($totalDiscountAmount),
+            ];
+        }
+
+        return [
+            'total_sales_price' => (int) round((float) $totalSalesPrice),
+            'total_discount_amt' => (int) round((float) $totalDiscountAmount),
+        ];
+    }
+
+    public function couponConditionMismatch(
+        bool $hasMemberCouponCode,
+        mixed $memberCouponConditions,
+        bool $hasPromotionCouponCode,
+        mixed $promotionCouponConditions,
+    ): bool {
+        $hasMemberCouponConditions = $this->normalizeConditions($memberCouponConditions) !== [];
+        $hasPromotionCouponConditions = $this->normalizeConditions($promotionCouponConditions) !== [];
+
+        return ($hasMemberCouponCode && ! $hasMemberCouponConditions)
+            || ($hasPromotionCouponCode && ! $hasPromotionCouponConditions)
+            || (! $hasMemberCouponCode && $hasMemberCouponConditions)
+            || (! $hasPromotionCouponCode && $hasPromotionCouponConditions);
+    }
+
     public function enumValue(mixed $value): mixed
     {
         return $value instanceof BackedEnum ? $value->value : $value;

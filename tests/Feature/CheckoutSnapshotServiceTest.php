@@ -143,6 +143,46 @@ it('extracts reusable cart line values for host line builders', function (): voi
         ->and($service->enumValue(CheckoutSnapshotFakeProductType::Course))->toBe(3);
 });
 
+it('calculates checkout totals in host compatible formats', function (): void {
+    $service = app(CheckoutSnapshotService::class);
+    $cart = new CheckoutSnapshotFakeCart(
+        items: [],
+        conditions: [],
+        subtotal: '2300',
+        total: '1750',
+    );
+
+    expect($service->checkoutTotals($cart))->toBe([
+        'total_sales_price' => 1750,
+        'total_discount_amt' => 550,
+    ])
+        ->and($service->checkoutTotals($cart, stringValues: true))->toBe([
+            'total_sales_price' => '1750',
+            'total_discount_amt' => '550',
+        ]);
+});
+
+it('detects coupon code and cart condition mismatches', function (): void {
+    $service = app(CheckoutSnapshotService::class);
+    $memberConditions = [
+        new CheckoutSnapshotFakeCondition('Member', 'member_coupon', '-100', []),
+    ];
+    $promotionConditions = [
+        new CheckoutSnapshotFakeCondition('Promotion', 'promotion_coupon', '-50', []),
+    ];
+
+    expect($service->couponConditionMismatch(
+        hasMemberCouponCode: true,
+        memberCouponConditions: $memberConditions,
+        hasPromotionCouponCode: true,
+        promotionCouponConditions: $promotionConditions,
+    ))->toBeFalse()
+        ->and($service->couponConditionMismatch(true, [], false, []))->toBeTrue()
+        ->and($service->couponConditionMismatch(false, $memberConditions, false, []))->toBeTrue()
+        ->and($service->couponConditionMismatch(false, [], true, []))->toBeTrue()
+        ->and($service->couponConditionMismatch(false, [], false, $promotionConditions))->toBeTrue();
+});
+
 it('builds order detail rows from host schemas', function (): void {
     $service = app(CheckoutSnapshotService::class);
 
