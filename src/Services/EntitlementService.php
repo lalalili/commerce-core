@@ -2,6 +2,7 @@
 
 namespace Lalalili\CommerceCore\Services;
 
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
 use Lalalili\CommerceCore\Models\ProductUser;
 use Lalalili\CommerceCore\Support\ModelAttributeMapper;
@@ -10,7 +11,7 @@ class EntitlementService
 {
     public function __construct(private readonly ModelAttributeMapper $attributes) {}
 
-    public function grantOrder(Model $order, int|string|null $createdBy = null): void
+    public function grantOrder(Model $order, int|string|null $createdBy = null, ?DateTimeInterface $createdAt = null): void
     {
         if (! $this->enabled()) {
             return;
@@ -20,7 +21,7 @@ class EntitlementService
 
         $order->loadMissing(["{$detailsRelation}.product"]);
         $productUserModel = $this->productUserModel();
-        $now = now();
+        $grantedAt = $createdAt ?? now();
 
         foreach ($order->getRelationValue($detailsRelation) ?? [] as $detail) {
             if (! $detail instanceof Model || ! $detail->getRelationValue('product') instanceof Model) {
@@ -38,7 +39,7 @@ class EntitlementService
                 'order_number' => data_get($order, 'number'),
                 'product_type' => data_get($detail, $this->attributes->column('order_details', 'product_type', 'product_type') ?? 'product_type'),
                 'created_by' => $createdBy ?? data_get($order, 'user_id'),
-                'created_at' => $now,
+                'created_at' => $grantedAt,
             ]));
 
             if ($lookup === []) {

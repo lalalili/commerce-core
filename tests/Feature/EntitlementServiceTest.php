@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Carbon;
 use Lalalili\CommerceCore\Models\Order;
 use Lalalili\CommerceCore\Models\OrderDetail;
 use Lalalili\CommerceCore\Models\Product;
@@ -61,6 +62,23 @@ it('grants entitlements idempotently', function (): void {
         ->where('product_id', $product->id)
         ->where('user_id', 1)
         ->count())->toBe(1);
+});
+
+it('uses supplied entitlement audit attributes', function (): void {
+    [$order, $product] = seedEntitlementOrder(1, '260622AUDT');
+    $createdAt = Carbon::parse('2026-06-25 10:30:00');
+
+    app(EntitlementService::class)->grantOrder($order, 99, $createdAt);
+
+    /** @var ProductUser|null $entitlement */
+    $entitlement = ProductUser::query()
+        ->where('product_id', $product->id)
+        ->where('user_id', 1)
+        ->first();
+
+    expect($entitlement)->not->toBeNull()
+        ->and($entitlement?->created_by)->toBe(99)
+        ->and((string) $entitlement?->created_at)->toBe('2026-06-25 10:30:00');
 });
 
 it('skips order details whose product cannot be resolved', function (): void {
