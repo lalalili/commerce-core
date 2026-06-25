@@ -97,6 +97,36 @@ it('builds issued member coupon payloads with formatted dates for aitehub style 
     ]);
 });
 
+it('can resolve start dates from scheduled template effective days when hosts opt in', function (): void {
+    $now = CarbonImmutable::parse('2026-06-25 10:15:00');
+    $builder = app(ScheduledCouponTemplatePayloadBuilder::class);
+
+    $payload = $builder->build(
+        template: [
+            'title' => '排程_兌換禮',
+            'amount' => 80,
+            'trigger_amount' => 300,
+            'scope' => 1,
+            'scope_products' => [],
+            'available_days' => 7,
+            'effective_days' => 2,
+        ],
+        userId: 789,
+        memberType: 1,
+        code: 'REDEEM789',
+        now: $now,
+        options: [
+            'title' => '兌換禮',
+            'use_effective_days_for_start_date' => true,
+        ],
+    );
+
+    expect($payload['start_date']?->toDateTimeString())->toBe('2026-06-27 10:15:00')
+        ->and($builder->resolveStartDate(3, $now)->toDateTimeString())->toBe('2026-06-28 10:15:00')
+        ->and($builder->resolveStartDate(null, $now))->toBe($now)
+        ->and($builder->resolveStartDate(3, '2026-06-25 10:15:00'))->toBe('2026-06-25 10:15:00');
+});
+
 it('extracts reusable title suffixes from scheduled template titles', function (?string $title, string $expected): void {
     expect(app(ScheduledCouponTemplatePayloadBuilder::class)->extractTitleSuffix($title))->toBe($expected);
 })->with([

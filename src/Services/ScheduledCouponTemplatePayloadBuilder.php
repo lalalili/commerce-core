@@ -19,6 +19,7 @@ class ScheduledCouponTemplatePayloadBuilder
      *     end_date_end_of_day?: bool,
      *     decode_scope_products?: bool,
      *     scope_products_empty_as_null?: bool,
+     *     use_effective_days_for_start_date?: bool,
      *     start_date?: CarbonInterface|string,
      *     created_at?: CarbonInterface|string,
      *     updated_at?: CarbonInterface|string,
@@ -36,7 +37,11 @@ class ScheduledCouponTemplatePayloadBuilder
         array $overrides = [],
     ): array {
         $formatDates = (bool) ($options['format_dates'] ?? false);
-        $startDate = $options['start_date'] ?? $now;
+        $startDate = $options['start_date'] ?? (
+            (bool) ($options['use_effective_days_for_start_date'] ?? false)
+                ? $this->resolveStartDate($template['effective_days'] ?? null, $now)
+                : $now
+        );
         $createdAt = $options['created_at'] ?? $now;
         $updatedAt = $options['updated_at'] ?? $now;
 
@@ -109,6 +114,17 @@ class ScheduledCouponTemplatePayloadBuilder
         $endDate = $now->copy()->addDays($days);
 
         return $endOfDay ? $endDate->endOfDay() : $endDate;
+    }
+
+    public function resolveStartDate(mixed $effectiveDays, CarbonInterface|string $now): CarbonInterface|string
+    {
+        $days = (int) ($effectiveDays ?? 0);
+
+        if ($days <= 0 || ! $now instanceof CarbonInterface) {
+            return $now;
+        }
+
+        return $now->copy()->addDays($days);
     }
 
     /**
