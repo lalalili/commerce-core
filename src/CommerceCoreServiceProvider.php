@@ -4,6 +4,7 @@ namespace Lalalili\CommerceCore;
 
 use Lalalili\CommerceCore\Services\CartItemAttributeNormalizer;
 use Lalalili\CommerceCore\Services\CartPromotionLineResolver;
+use Lalalili\CommerceCore\Services\CartPromotionRefreshInputFactoryService;
 use Lalalili\CommerceCore\Services\CheckoutCartCompletionService;
 use Lalalili\CommerceCore\Services\CheckoutOrderBuilderService;
 use Lalalili\CommerceCore\Services\CheckoutOrderDataFactory;
@@ -54,6 +55,7 @@ class CommerceCoreServiceProvider extends PackageServiceProvider
         $this->app->singleton(OrderNumberGenerator::class);
         $this->app->singleton(CartItemAttributeNormalizer::class);
         $this->app->singleton(CartPromotionLineResolver::class);
+        $this->app->singleton(CartPromotionRefreshInputFactoryService::class);
         $this->app->singleton(CheckoutCartCompletionService::class);
         $this->app->singleton(CheckoutOrderBuilderService::class);
         $this->app->singleton(CheckoutOrderDataFactory::class);

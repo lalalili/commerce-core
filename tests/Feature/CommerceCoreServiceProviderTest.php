@@ -2,6 +2,7 @@
 
 use Lalalili\CommerceCore\Services\CartItemAttributeNormalizer;
 use Lalalili\CommerceCore\Services\CartPromotionLineResolver;
+use Lalalili\CommerceCore\Services\CartPromotionRefreshInputFactoryService;
 use Lalalili\CommerceCore\Services\CheckoutCartCompletionService;
 use Lalalili\CommerceCore\Services\CheckoutOrderBuilderService;
 use Lalalili\CommerceCore\Services\CheckoutOrderDataFactory;
@@ -39,6 +40,7 @@ it('registers reusable commerce services as singletons', function (string $abstr
     OrderNumberGenerator::class,
     CartItemAttributeNormalizer::class,
     CartPromotionLineResolver::class,
+    CartPromotionRefreshInputFactoryService::class,
     CheckoutCartCompletionService::class,
     CheckoutOrderBuilderService::class,
     CheckoutOrderDataFactory::class,
