@@ -97,6 +97,36 @@ it('normalizes trace arrays and returns the first entry', function (): void {
     ])->and($service->firstEntryArray(null))->toBe([]);
 });
 
+it('normalizes trace-like objects and returns the first trace entry', function (): void {
+    $service = app(CouponPricingTraceContextService::class);
+    $trace = new class
+    {
+        /**
+         * @return list<array<string, mixed>>
+         */
+        public function toArray(): array
+        {
+            return [
+                ['stage' => 'coupon_validate', 'code' => 'A'],
+                ['stage' => 'coupon_apply', 'code' => 'A', 0 => 'drop'],
+            ];
+        }
+    };
+
+    expect($service->traceArray($trace))->toBe([
+        ['stage' => 'coupon_validate', 'code' => 'A'],
+        ['stage' => 'coupon_apply', 'code' => 'A', 0 => 'drop'],
+    ])->and($service->normalizeTraceEntries($trace))->toBe([
+        ['stage' => 'coupon_validate', 'code' => 'A'],
+        ['stage' => 'coupon_apply', 'code' => 'A'],
+    ])->and($service->firstTraceEntryArray($trace))->toBe([
+        'stage' => 'coupon_validate',
+        'code' => 'A',
+    ])->and($service->traceArray(new stdClass))->toBeNull()
+        ->and($service->normalizeTraceEntries(new stdClass))->toBe([])
+        ->and($service->firstTraceEntryArray(new stdClass))->toBe([]);
+});
+
 it('appends and clears coupon trace entries on cart context', function (): void {
     $cart = new TraceTestCart(['pricing_trace' => ['coupon' => [['stage' => 'coupon_apply', 'kind' => 'member', 'code' => 'KEEP']]]]);
     $service = app(CouponPricingTraceContextService::class);

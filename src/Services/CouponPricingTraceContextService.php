@@ -97,9 +97,9 @@ class CouponPricingTraceContextService
     /**
      * @param  array<string, mixed>|list<array<string, mixed>>|null  $trace
      */
-    public function appendCouponTrace(mixed $cart, ?array $trace): void
+    public function appendCouponTrace(mixed $cart, mixed $trace): void
     {
-        $entries = $this->normalizeEntries($trace);
+        $entries = $this->normalizeTraceEntries($trace);
         if ($entries === []) {
             return;
         }
@@ -124,6 +124,40 @@ class CouponPricingTraceContextService
     public function normalizeEntries(?array $trace): array
     {
         return $this->traces->normalizeEntries($trace);
+    }
+
+    /**
+     * @return array<string, mixed>|list<array<string, mixed>>|null
+     */
+    public function traceArray(mixed $trace): ?array
+    {
+        if (is_array($trace)) {
+            return $trace;
+        }
+
+        if (is_object($trace) && method_exists($trace, 'toArray')) {
+            $payload = $trace->toArray();
+
+            return is_array($payload) ? $payload : null;
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function normalizeTraceEntries(mixed $trace): array
+    {
+        return $this->normalizeEntries($this->traceArray($trace));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function firstTraceEntryArray(mixed $trace): array
+    {
+        return $this->normalizeTraceEntries($trace)[0] ?? [];
     }
 
     /**
