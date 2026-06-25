@@ -138,6 +138,27 @@ it('issues each normalized tax group through a host issuer callback', function (
         ]);
 });
 
+it('finds selected tax group details across integer and string keys', function (): void {
+    $service = app(OrderInvoiceTaxGroupService::class);
+
+    $details = [
+        0 => [
+            ['product_title' => 'Tax free item', 'sales_price' => 100, 'qty' => 1],
+        ],
+        '1' => [
+            ['product_title' => 'Taxed item', 'sales_price' => 200, 'qty' => 1],
+        ],
+    ];
+
+    expect($service->selectedTaxGroupDetails($details, '0'))->toBe([
+        ['product_title' => 'Tax free item', 'sales_price' => 100, 'qty' => 1],
+    ])
+        ->and($service->selectedTaxGroupDetails($details, 1))->toBe([
+            ['product_title' => 'Taxed item', 'sales_price' => 200, 'qty' => 1],
+        ])
+        ->and($service->selectedTaxGroupDetails($details, 2))->toBeNull();
+});
+
 it('issues only the selected tax group', function (): void {
     $service = app(OrderInvoiceTaxGroupService::class);
     $order = Order::query()->create(['number' => 'OD10003', 'user_id' => 1]);

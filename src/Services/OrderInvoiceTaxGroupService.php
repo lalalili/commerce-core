@@ -148,6 +148,31 @@ class OrderInvoiceTaxGroupService
     }
 
     /**
+     * @template T of array<string, mixed>
+     *
+     * @param  array<int|string, list<T>>  $orderDetailsWithTax
+     * @return list<T>|null
+     */
+    public function selectedTaxGroupDetails(array $orderDetailsWithTax, int|string $taxType): ?array
+    {
+        if (isset($orderDetailsWithTax[$taxType])) {
+            return $orderDetailsWithTax[$taxType];
+        }
+
+        $numericTaxType = (int) $taxType;
+        if (isset($orderDetailsWithTax[$numericTaxType])) {
+            return $orderDetailsWithTax[$numericTaxType];
+        }
+
+        $stringTaxType = (string) $taxType;
+        if (isset($orderDetailsWithTax[$stringTaxType])) {
+            return $orderDetailsWithTax[$stringTaxType];
+        }
+
+        return null;
+    }
+
+    /**
      * @param  array<int|string, list<array<string, mixed>>>  $orderDetailsWithTax
      * @param  callable(string, int, Model, list<array{title: string, sales_price: int, qty: int}>): array<string, mixed>  $issuer
      * @return array<string, mixed>
@@ -163,8 +188,10 @@ class OrderInvoiceTaxGroupService
             return [];
         }
 
-        $normalized = $this->normalizeOrderDetailsWithTax($orderDetailsWithTax);
-        $details = $normalized[$parsed['tax_type']] ?? null;
+        $details = $this->selectedTaxGroupDetails(
+            $this->normalizeOrderDetailsWithTax($orderDetailsWithTax),
+            $parsed['tax_type'],
+        );
         if ($details === null) {
             return [];
         }
