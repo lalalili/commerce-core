@@ -29,6 +29,7 @@ use Lalalili\CommerceCore\Services\OrderLifecycleService;
 use Lalalili\CommerceCore\Services\PaymentApplicationHookDispatcher;
 use Lalalili\CommerceCore\Services\PaymentApplicationService;
 use Lalalili\CommerceCore\Services\PaymentLogService;
+use Lalalili\CommerceCore\Services\PromotionContextPayloadBuilder;
 use Lalalili\CommerceCore\Services\PromotionRefreshPipelineMetadata;
 use Lalalili\CommerceCore\Services\ScheduledCouponTemplatePayloadBuilder;
 use Lalalili\CommerceCore\Support\ModelAttributeMapper;
@@ -70,6 +71,7 @@ it('registers reusable commerce services as singletons', function (string $abstr
     PaymentApplicationHookDispatcher::class,
     PaymentApplicationService::class,
     PaymentLogService::class,
+    PromotionContextPayloadBuilder::class,
     PromotionRefreshPipelineMetadata::class,
     ScheduledCouponTemplatePayloadBuilder::class,
 ]);

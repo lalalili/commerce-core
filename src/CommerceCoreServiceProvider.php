@@ -31,6 +31,7 @@ use Lalalili\CommerceCore\Services\OrderLifecycleService;
 use Lalalili\CommerceCore\Services\PaymentApplicationHookDispatcher;
 use Lalalili\CommerceCore\Services\PaymentApplicationService;
 use Lalalili\CommerceCore\Services\PaymentLogService;
+use Lalalili\CommerceCore\Services\PromotionContextPayloadBuilder;
 use Lalalili\CommerceCore\Services\PromotionRefreshPipelineMetadata;
 use Lalalili\CommerceCore\Services\ScheduledCouponTemplatePayloadBuilder;
 use Lalalili\CommerceCore\Support\ModelAttributeMapper;
@@ -85,6 +86,7 @@ class CommerceCoreServiceProvider extends PackageServiceProvider
         $this->app->singleton(PaymentApplicationHookDispatcher::class);
         $this->app->singleton(PaymentApplicationService::class);
         $this->app->singleton(PaymentLogService::class);
+        $this->app->singleton(PromotionContextPayloadBuilder::class);
         $this->app->singleton(PromotionRefreshPipelineMetadata::class);
         $this->app->singleton(ScheduledCouponTemplatePayloadBuilder::class);
     }
