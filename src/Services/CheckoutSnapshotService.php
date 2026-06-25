@@ -176,6 +176,35 @@ class CheckoutSnapshotService
         return $attributes;
     }
 
+    /**
+     * @param  list<string>  $conditionAttributeKeys
+     * @return array{
+     *     id:string,
+     *     title:string,
+     *     decoded_title:string,
+     *     quantity:int,
+     *     list_price:string,
+     *     sales_price:string,
+     *     condition_attributes:array<string, list<mixed>>
+     * }
+     */
+    public function cartLineBaseValues(
+        mixed $item,
+        array $conditionAttributeKeys = ['event_id', 'event_title'],
+    ): array {
+        $title = (string) data_get($item, 'name', '');
+
+        return [
+            'id' => (string) data_get($item, 'id', ''),
+            'title' => $title,
+            'decoded_title' => html_entity_decode($title),
+            'quantity' => (int) data_get($item, 'quantity', 0),
+            'list_price' => $this->moneyString(data_get($item, 'price', 0)),
+            'sales_price' => $this->moneyString($this->cartItemPriceWithConditions($item)),
+            'condition_attributes' => $this->cartLineConditionAttributes($item, $conditionAttributeKeys),
+        ];
+    }
+
     public function cartItemPriceWithConditions(mixed $item): int|float|null
     {
         if (! is_object($item) || ! method_exists($item, 'getPriceWithConditions')) {

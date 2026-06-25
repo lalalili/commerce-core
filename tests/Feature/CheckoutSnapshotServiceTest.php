@@ -104,7 +104,7 @@ it('extracts reusable cart line values for host line builders', function (): voi
     $items = [
         new CheckoutSnapshotFakeItem(
             id: 'SKU-1',
-            name: 'Course',
+            name: 'Course &amp; Bundle',
             price: '1000.40',
             quantity: 2,
             attributes: [],
@@ -130,12 +130,25 @@ it('extracts reusable cart line values for host line builders', function (): voi
     ];
 
     $attributes = $service->cartLineConditionAttributes($items[0]);
+    $baseValues = $service->cartLineBaseValues($items[0]);
 
     expect($service->expectedCartLineCount($items))->toBe(1)
         ->and($service->expectedCartLineCount(null))->toBe(0)
         ->and($attributes)->toBe([
             'event_id' => [11, 12],
             'event_title' => ['Launch', 'Bundle'],
+        ])
+        ->and($baseValues)->toBe([
+            'id' => 'SKU-1',
+            'title' => 'Course &amp; Bundle',
+            'decoded_title' => 'Course & Bundle',
+            'quantity' => 2,
+            'list_price' => '1000',
+            'sales_price' => '990',
+            'condition_attributes' => [
+                'event_id' => [11, 12],
+                'event_title' => ['Launch', 'Bundle'],
+            ],
         ])
         ->and($service->cartItemPriceWithConditions($items[0]))->toBe(990.4)
         ->and($service->moneyString($items[0]->price))->toBe('1000')
