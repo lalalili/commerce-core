@@ -266,6 +266,30 @@ class CheckoutSnapshotService
     }
 
     /**
+     * @param  array<string, mixed>  $requestSnapshot
+     * @param  array<string, mixed>  $cartContext
+     * @param  array<string, mixed>  $extra
+     * @return array<string, mixed>
+     */
+    public function checkoutFailureContext(
+        Throwable $exception,
+        array $requestSnapshot,
+        array $cartContext,
+        ?CarbonInterface $capturedAt = null,
+        int $snapshotVersion = 1,
+        array $extra = [],
+    ): array {
+        return array_merge([
+            'snapshot_version' => $snapshotVersion,
+            'captured_at' => ($capturedAt ?? now())->toDateTimeString(),
+            'exception' => $exception::class,
+            'exception_message' => $exception->getMessage(),
+            'request' => $requestSnapshot,
+            'checkout_cart' => $cartContext,
+        ], $extra);
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      */
     public function hashPayload(array $payload): string

@@ -301,6 +301,42 @@ it('builds reusable checkout snapshot persistence attributes', function (): void
     ]);
 });
 
+it('builds reusable checkout failure log context', function (): void {
+    $service = app(CheckoutSnapshotService::class);
+    $capturedAt = now()->setDate(2026, 6, 25)->setTime(11, 45);
+    $exception = new RuntimeException('Checkout failed');
+
+    $context = $service->checkoutFailureContext(
+        exception: $exception,
+        requestSnapshot: [
+            'payment_type' => 'credit-card',
+        ],
+        cartContext: [
+            'capture_failed' => true,
+            'message' => 'checkout cart unavailable',
+        ],
+        capturedAt: $capturedAt,
+        extra: [
+            'order_number' => 'O-001',
+        ],
+    );
+
+    expect($context)->toBe([
+        'snapshot_version' => 1,
+        'captured_at' => '2026-06-25 11:45:00',
+        'exception' => RuntimeException::class,
+        'exception_message' => 'Checkout failed',
+        'request' => [
+            'payment_type' => 'credit-card',
+        ],
+        'checkout_cart' => [
+            'capture_failed' => true,
+            'message' => 'checkout cart unavailable',
+        ],
+        'order_number' => 'O-001',
+    ]);
+});
+
 class CheckoutSnapshotFakeCart
 {
     public function __construct(
