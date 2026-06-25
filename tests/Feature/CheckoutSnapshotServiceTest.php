@@ -143,6 +143,27 @@ it('extracts reusable cart line values for host line builders', function (): voi
         ->and($service->enumValue(CheckoutSnapshotFakeProductType::Course))->toBe(3);
 });
 
+it('checks whether host cart line snapshots cover every checkout line', function (): void {
+    $service = app(CheckoutSnapshotService::class);
+    $items = [
+        new CheckoutSnapshotFakeItem(id: 'SKU-1', name: 'Course', price: 1000, quantity: 2, attributes: [], conditions: []),
+        new CheckoutSnapshotFakeItem(id: 'SKU-2', name: 'Book', price: 500, quantity: 1, attributes: [], conditions: []),
+        new CheckoutSnapshotFakeItem(id: 'SKU-3', name: 'Ignored', price: 300, quantity: 0, attributes: [], conditions: []),
+    ];
+
+    expect($service->hasCompleteLineSnapshots([
+        ['product_id' => 'SKU-1', 'quantity' => 2],
+        ['product_id' => 'SKU-2', 'quantity' => 1],
+    ], $items))->toBeTrue()
+        ->and($service->hasCompleteLineSnapshots([], $items))->toBeFalse()
+        ->and($service->hasCompleteLineSnapshots([
+            ['product_id' => 'SKU-1', 'quantity' => 2],
+        ], $items))->toBeFalse()
+        ->and($service->hasCompleteLineSnapshots([
+            ['product_id' => 'SKU-1', 'quantity' => 2],
+        ], null))->toBeFalse();
+});
+
 it('calculates checkout totals in host compatible formats', function (): void {
     $service = app(CheckoutSnapshotService::class);
     $cart = new CheckoutSnapshotFakeCart(

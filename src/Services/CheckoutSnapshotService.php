@@ -142,6 +142,16 @@ class CheckoutSnapshotService
     }
 
     /**
+     * @param  list<array<string, mixed>>  $lineSnapshots
+     * @param  iterable<int, mixed>|mixed  $cartContent
+     */
+    public function hasCompleteLineSnapshots(array $lineSnapshots, mixed $cartContent): bool
+    {
+        return $lineSnapshots !== []
+            && count($lineSnapshots) === $this->expectedCartLineCount($cartContent);
+    }
+
+    /**
      * @param  list<string>  $attributeKeys
      * @return array<string, list<mixed>>
      */
