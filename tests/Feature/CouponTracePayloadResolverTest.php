@@ -52,6 +52,23 @@ it('falls back to scalar id fields when model keys are not available', function 
     ]);
 });
 
+it('falls back to coupon ids stored in host attributes', function (): void {
+    $resolver = app(CouponTracePayloadResolver::class);
+    $coupon = new class
+    {
+        /**
+         * @var array<string, mixed>
+         */
+        public array $attributes = [
+            'coupon_id' => 'coupon-789',
+        ];
+    };
+
+    expect($resolver->payload($coupon))->toMatchArray([
+        'id' => 'coupon-789',
+    ]);
+});
+
 it('normalizes missing or non scalar coupon fields', function (): void {
     $resolver = app(CouponTracePayloadResolver::class);
 

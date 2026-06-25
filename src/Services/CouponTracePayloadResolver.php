@@ -44,7 +44,13 @@ class CouponTracePayloadResolver
 
         $id = data_get($coupon, 'id');
 
-        return is_int($id) || is_string($id) ? $id : null;
+        if (is_int($id) || is_string($id)) {
+            return $id;
+        }
+
+        $attributeId = data_get($coupon, 'attributes.coupon_id');
+
+        return is_int($attributeId) || is_string($attributeId) ? $attributeId : null;
     }
 
     public function scope(mixed $coupon): string
