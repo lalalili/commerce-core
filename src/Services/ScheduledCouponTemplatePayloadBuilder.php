@@ -56,6 +56,37 @@ class ScheduledCouponTemplatePayloadBuilder
     }
 
     /**
+     * @param  array<string, mixed>  $payload
+     * @param  list<string>  $jsonArrayKeys
+     * @return array<string, mixed>
+     */
+    public function preparePayloadForInsert(array $payload, array $jsonArrayKeys = ['scope_products']): array
+    {
+        foreach ($jsonArrayKeys as $key) {
+            if (! array_key_exists($key, $payload) || ! is_array($payload[$key])) {
+                continue;
+            }
+
+            $payload[$key] = json_encode($payload[$key]);
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $payloads
+     * @param  list<string>  $jsonArrayKeys
+     * @return array<int, array<string, mixed>>
+     */
+    public function preparePayloadsForInsert(array $payloads, array $jsonArrayKeys = ['scope_products']): array
+    {
+        return array_map(
+            fn (array $payload): array => $this->preparePayloadForInsert($payload, $jsonArrayKeys),
+            $payloads
+        );
+    }
+
+    /**
      * @param  array<string, mixed>  $template
      * @param  array{
      *     title?: string|null,

@@ -194,3 +194,45 @@ it('extracts scheduled template payload fields from arrays and objects', functio
         'effective_days' => 2,
     ]);
 });
+
+it('prepares issued coupon payload arrays for insert operations', function (): void {
+    $builder = app(ScheduledCouponTemplatePayloadBuilder::class);
+
+    expect($builder->preparePayloadForInsert([
+        'code' => 'BIRTHDAY-1',
+        'scope_products' => [11, '22'],
+        'metadata' => ['campaign' => 'birthday'],
+    ], ['scope_products', 'metadata']))->toBe([
+        'code' => 'BIRTHDAY-1',
+        'scope_products' => '[11,"22"]',
+        'metadata' => '{"campaign":"birthday"}',
+    ]);
+
+    expect($builder->preparePayloadsForInsert([
+        [
+            'code' => 'BIRTHDAY-2',
+            'scope_products' => null,
+        ],
+        [
+            'code' => 'BIRTHDAY-3',
+            'scope_products' => [33],
+        ],
+        [
+            'code' => 'BIRTHDAY-4',
+            'scope_products' => '[44]',
+        ],
+    ]))->toBe([
+        [
+            'code' => 'BIRTHDAY-2',
+            'scope_products' => null,
+        ],
+        [
+            'code' => 'BIRTHDAY-3',
+            'scope_products' => '[33]',
+        ],
+        [
+            'code' => 'BIRTHDAY-4',
+            'scope_products' => '[44]',
+        ],
+    ]);
+});
