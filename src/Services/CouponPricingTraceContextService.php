@@ -94,9 +94,6 @@ class CouponPricingTraceContextService
         );
     }
 
-    /**
-     * @param  array<string, mixed>|list<array<string, mixed>>|null  $trace
-     */
     public function appendCouponTrace(mixed $cart, mixed $trace): void
     {
         $entries = $this->normalizeTraceEntries($trace);
