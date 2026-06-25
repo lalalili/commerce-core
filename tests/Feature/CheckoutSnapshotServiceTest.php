@@ -320,6 +320,38 @@ it('summarizes checkout consistency for host order guards', function (): void {
         ]);
 });
 
+it('reports reusable checkout guard failure reasons', function (): void {
+    $service = app(CheckoutSnapshotService::class);
+    $items = [
+        new CheckoutSnapshotFakeItem(id: 'SKU-1', name: 'Course', price: 1000, quantity: 1, attributes: [], conditions: []),
+    ];
+
+    expect($service->checkoutConsistencyFailure([
+        'has_cart_items' => true,
+        'has_positive_total' => true,
+        'coupon_condition_mismatch' => false,
+    ]))->toBeNull()
+        ->and($service->checkoutConsistencyFailure([
+            'has_cart_items' => false,
+            'has_positive_total' => true,
+            'coupon_condition_mismatch' => false,
+        ]))->toBe(CheckoutSnapshotService::CHECKOUT_FAILURE_CART_ITEMS)
+        ->and($service->checkoutConsistencyFailure([
+            'has_cart_items' => true,
+            'has_positive_total' => false,
+            'coupon_condition_mismatch' => false,
+        ]))->toBe(CheckoutSnapshotService::CHECKOUT_FAILURE_CART_ITEMS)
+        ->and($service->checkoutConsistencyFailure([
+            'has_cart_items' => true,
+            'has_positive_total' => true,
+            'coupon_condition_mismatch' => true,
+        ]))->toBe(CheckoutSnapshotService::CHECKOUT_FAILURE_COUPON_CONDITION_MISMATCH)
+        ->and($service->cartLineSnapshotFailure([
+            ['product_id' => 'SKU-1', 'quantity' => 1],
+        ], $items))->toBeNull()
+        ->and($service->cartLineSnapshotFailure([], $items))->toBe(CheckoutSnapshotService::CHECKOUT_FAILURE_LINE_SNAPSHOTS);
+});
+
 it('detects coupon code and cart condition mismatches', function (): void {
     $service = app(CheckoutSnapshotService::class);
     $memberConditions = [

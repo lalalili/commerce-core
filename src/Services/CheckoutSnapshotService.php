@@ -19,6 +19,12 @@ class CheckoutSnapshotService
         'sort',
     ];
 
+    public const CHECKOUT_FAILURE_CART_ITEMS = 'cart_items';
+
+    public const CHECKOUT_FAILURE_COUPON_CONDITION_MISMATCH = 'coupon_condition_mismatch';
+
+    public const CHECKOUT_FAILURE_LINE_SNAPSHOTS = 'line_snapshots';
+
     /**
      * @param  list<string>  $itemAttributeKeys
      * @param  list<string>  $conditionAttributeKeys
@@ -149,6 +155,35 @@ class CheckoutSnapshotService
     {
         return $lineSnapshots !== []
             && count($lineSnapshots) === $this->expectedCartLineCount($cartContent);
+    }
+
+    /**
+     * @param  array{has_positive_total?: bool, has_cart_items?: bool, coupon_condition_mismatch?: bool}  $checkoutConsistency
+     */
+    public function checkoutConsistencyFailure(array $checkoutConsistency): ?string
+    {
+        if (! ($checkoutConsistency['has_positive_total'] ?? false) || ! ($checkoutConsistency['has_cart_items'] ?? false)) {
+            return self::CHECKOUT_FAILURE_CART_ITEMS;
+        }
+
+        if ($checkoutConsistency['coupon_condition_mismatch'] ?? false) {
+            return self::CHECKOUT_FAILURE_COUPON_CONDITION_MISMATCH;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $lineSnapshots
+     * @param  iterable<int, mixed>|mixed  $cartContent
+     */
+    public function cartLineSnapshotFailure(array $lineSnapshots, mixed $cartContent): ?string
+    {
+        if (! $this->hasCompleteLineSnapshots($lineSnapshots, $cartContent)) {
+            return self::CHECKOUT_FAILURE_LINE_SNAPSHOTS;
+        }
+
+        return null;
     }
 
     /**
