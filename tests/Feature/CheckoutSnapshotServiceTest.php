@@ -657,6 +657,85 @@ it('builds reusable checkout failure log context', function (): void {
     ]);
 });
 
+it('builds checkout failure context from a host cart resolver', function (): void {
+    $service = app(CheckoutSnapshotService::class);
+    $capturedAt = now()->setDate(2026, 6, 25)->setTime(12, 5);
+    $request = new CheckoutSnapshotFakeRequest([
+        'submission_id' => 'SUB-1',
+        'pay_type' => 'credit_card',
+    ]);
+    $cart = new CheckoutSnapshotFakeCart(
+        [
+            new CheckoutSnapshotFakeItem(
+                id: 'P001',
+                name: 'Book',
+                price: 500,
+                quantity: 2,
+                attributes: ['prod_no' => 'P001', 'weight' => 1],
+                conditions: [],
+            ),
+        ],
+        [],
+        1000,
+        900,
+    );
+
+    $context = $service->checkoutFailureContextFromCartResolver(
+        exception: new RuntimeException('Checkout failed'),
+        request: $request,
+        cartResolver: static fn (): CheckoutSnapshotFakeCart => $cart,
+        requestSchema: [
+            'submission_id' => ['default' => ''],
+            'payment_type' => 'pay_type',
+        ],
+        cartItemAttributeKeys: ['prod_no'],
+        capturedAt: $capturedAt,
+        extra: [
+            'reason' => 'cart_items',
+        ],
+    );
+
+    expect($context)->toMatchArray([
+        'snapshot_version' => 1,
+        'captured_at' => '2026-06-25 12:05:00',
+        'exception' => RuntimeException::class,
+        'exception_message' => 'Checkout failed',
+        'request' => [
+            'submission_id' => 'SUB-1',
+            'payment_type' => 'credit_card',
+        ],
+        'reason' => 'cart_items',
+    ])
+        ->and($context['checkout_cart']['items'][0]['attributes'])->toBe([
+            'prod_no' => 'P001',
+        ])
+        ->and($context['checkout_cart']['total'])->toBe(900);
+});
+
+it('falls back when checkout failure cart resolving fails', function (): void {
+    $service = app(CheckoutSnapshotService::class);
+
+    $context = $service->checkoutFailureContextFromCartResolver(
+        exception: new RuntimeException('Checkout failed'),
+        request: new CheckoutSnapshotFakeRequest(['pay_type' => 'credit_card']),
+        cartResolver: static function (): never {
+            throw new RuntimeException('cart unavailable');
+        },
+        requestSchema: [
+            'payment_type' => 'pay_type',
+        ],
+    );
+
+    expect($context['request'])->toBe([
+        'payment_type' => 'credit_card',
+    ])
+        ->and($context['checkout_cart'])->toBe([
+            'capture_failed' => true,
+            'message' => 'cart unavailable',
+            'exception' => RuntimeException::class,
+        ]);
+});
+
 it('reads request values with safe fallbacks for host snapshots', function (): void {
     $service = app(CheckoutSnapshotService::class);
     $request = new CheckoutSnapshotFakeRequest([

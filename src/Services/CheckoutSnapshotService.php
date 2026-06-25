@@ -669,6 +669,45 @@ class CheckoutSnapshotService
         ], $extra);
     }
 
+    /**
+     * @param  callable(): mixed  $cartResolver
+     * @param  array<int|string, string|array{source?:string, filled?:bool, default?:mixed}>  $requestSchema
+     * @param  list<string>  $cartItemAttributeKeys
+     * @param  array<string, mixed>  $extra
+     * @return array<string, mixed>
+     */
+    public function checkoutFailureContextFromCartResolver(
+        Throwable $exception,
+        mixed $request,
+        callable $cartResolver,
+        array $requestSchema,
+        array $cartItemAttributeKeys = [],
+        ?CarbonInterface $capturedAt = null,
+        int $snapshotVersion = 1,
+        array $extra = [],
+    ): array {
+        $cartContext = [
+            'capture_failed' => true,
+            'message' => 'checkout cart unavailable',
+        ];
+
+        try {
+            $cartContext = $this->captureCart($cartResolver(), $cartItemAttributeKeys);
+        } catch (Throwable $cartException) {
+            $cartContext['exception'] = $cartException::class;
+            $cartContext['message'] = $cartException->getMessage();
+        }
+
+        return $this->checkoutFailureContext(
+            exception: $exception,
+            requestSnapshot: $this->requestSnapshot($request, $requestSchema),
+            cartContext: $cartContext,
+            capturedAt: $capturedAt,
+            snapshotVersion: $snapshotVersion,
+            extra: $extra,
+        );
+    }
+
     public function requestInput(mixed $request, string $key, mixed $default = null): mixed
     {
         if (! is_object($request) || ! method_exists($request, 'input')) {
