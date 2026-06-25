@@ -292,6 +292,65 @@ class OrderInvoiceTaxGroupService
     }
 
     /**
+     * @param  callable(string): (Model|null)  $orderResolver
+     * @param  callable(Model): array<int|string, list<array<string, mixed>>>  $orderDetailsResolver
+     * @param  callable(string, int, Model, list<array{title: string, sales_price: int, qty: int}>): array<string, mixed>  $issuer
+     * @param  callable(string, array<string, mixed>): void|null  $failure
+     * @return array<string, mixed>
+     */
+    public function issueSelectedTaxGroupByOrderNoWithTax(
+        string $orderNoWithTax,
+        callable $orderResolver,
+        callable $orderDetailsResolver,
+        callable $issuer,
+        ?callable $failure = null,
+    ): array {
+        $parsed = $this->parseOrderNoWithTax($orderNoWithTax);
+
+        if ($parsed === null) {
+            if ($failure !== null) {
+                $failure('invalid_order_no_with_tax', [
+                    'order_no_with_tax' => $orderNoWithTax,
+                ]);
+            }
+
+            return [];
+        }
+
+        $order = $orderResolver($parsed['order_number']);
+
+        if (! $order instanceof Model) {
+            if ($failure !== null) {
+                $failure('order_not_found', [
+                    'order_number' => $parsed['order_number'],
+                ]);
+            }
+
+            return [];
+        }
+
+        $orderDetailsWithTax = $orderDetailsResolver($order);
+
+        if ($this->selectedTaxGroupDetails($orderDetailsWithTax, $parsed['tax_type']) === null) {
+            if ($failure !== null) {
+                $failure('tax_group_not_found', [
+                    'order_number' => $parsed['order_number'],
+                    'tax_type' => $parsed['tax_type'],
+                ]);
+            }
+
+            return [];
+        }
+
+        return $this->issueSelectedTaxGroup(
+            $orderNoWithTax,
+            $order,
+            $orderDetailsWithTax,
+            $issuer,
+        );
+    }
+
+    /**
      * @param  array<int|string, array<int, array<string, mixed>>>  $groups
      * @return array<int|string, list<array<string, mixed>>>
      */

@@ -326,3 +326,86 @@ it('issues only the selected tax group', function (): void {
     ])
         ->and($service->issueSelectedTaxGroup('INVALID', $order, [], fn (): array => ['issued' => true]))->toBe([]);
 });
+
+it('resolves and issues the selected tax group from an order number with tax suffix', function (): void {
+    $service = app(OrderInvoiceTaxGroupService::class);
+    $order = Order::query()->create(['number' => 'OD10006', 'user_id' => 1]);
+
+    $response = $service->issueSelectedTaxGroupByOrderNoWithTax(
+        orderNoWithTax: 'OD10006-1',
+        orderResolver: fn (string $orderNumber): ?Model => $orderNumber === 'OD10006' ? $order : null,
+        orderDetailsResolver: fn (Model $order): array => [
+            1 => [
+                ['title' => 'Taxed item', 'sales_price' => 300, 'qty' => 2],
+            ],
+            0 => [
+                ['title' => 'Tax free item', 'sales_price' => 100, 'qty' => 1],
+            ],
+        ],
+        issuer: fn (string $orderNoWithTax, int $taxType, Model $order, array $details): array => [
+            'order_number' => $orderNoWithTax,
+            'tax_type' => $taxType,
+            'base_order' => $order->getAttribute('number'),
+            'details' => $details,
+        ],
+    );
+
+    expect($response)->toBe([
+        'order_number' => 'OD10006-1',
+        'tax_type' => 1,
+        'base_order' => 'OD10006',
+        'details' => [
+            ['title' => 'Taxed item', 'sales_price' => 300, 'qty' => 2],
+        ],
+    ]);
+});
+
+it('reports selected tax group resolution failures to host callbacks', function (): void {
+    $service = app(OrderInvoiceTaxGroupService::class);
+    $order = Order::query()->create(['number' => 'OD10007', 'user_id' => 1]);
+    $failures = [];
+    $failure = function (string $reason, array $context) use (&$failures): void {
+        $failures[] = compact('reason', 'context');
+    };
+    $issuer = fn (): array => ['issued' => true];
+
+    expect($service->issueSelectedTaxGroupByOrderNoWithTax(
+        orderNoWithTax: 'INVALID',
+        orderResolver: fn (): ?Model => $order,
+        orderDetailsResolver: fn (): array => [],
+        issuer: $issuer,
+        failure: $failure,
+    ))->toBe([])
+        ->and($service->issueSelectedTaxGroupByOrderNoWithTax(
+            orderNoWithTax: 'MISSING-1',
+            orderResolver: fn (): ?Model => null,
+            orderDetailsResolver: fn (): array => [],
+            issuer: $issuer,
+            failure: $failure,
+        ))->toBe([])
+        ->and($service->issueSelectedTaxGroupByOrderNoWithTax(
+            orderNoWithTax: 'OD10007-2',
+            orderResolver: fn (): ?Model => $order,
+            orderDetailsResolver: fn (): array => [
+                1 => [
+                    ['title' => 'Taxed item', 'sales_price' => 300, 'qty' => 2],
+                ],
+            ],
+            issuer: $issuer,
+            failure: $failure,
+        ))->toBe([])
+        ->and($failures)->toBe([
+            [
+                'reason' => 'invalid_order_no_with_tax',
+                'context' => ['order_no_with_tax' => 'INVALID'],
+            ],
+            [
+                'reason' => 'order_not_found',
+                'context' => ['order_number' => 'MISSING'],
+            ],
+            [
+                'reason' => 'tax_group_not_found',
+                'context' => ['order_number' => 'OD10007', 'tax_type' => 2],
+            ],
+        ]);
+});
