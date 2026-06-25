@@ -37,6 +37,7 @@ use Lalalili\CommerceCore\Services\ScheduledCouponTemplatePayloadBuilder;
 use Lalalili\CommerceCore\Support\ModelAttributeMapper;
 use Lalalili\CommerceCore\Support\OrderItemNormalizer;
 use Lalalili\CommerceCore\Support\OrderNumberGenerator;
+use Lalalili\CommerceCore\Support\QueryBuilderHelper;
 
 it('registers reusable commerce services as singletons', function (string $abstract): void {
     expect(app()->isShared($abstract))->toBeTrue();
@@ -44,6 +45,7 @@ it('registers reusable commerce services as singletons', function (string $abstr
     ModelAttributeMapper::class,
     OrderItemNormalizer::class,
     OrderNumberGenerator::class,
+    QueryBuilderHelper::class,
     CartItemAttributeNormalizer::class,
     CartPromotionLineResolver::class,
     CartPromotionRefreshInputFactoryService::class,

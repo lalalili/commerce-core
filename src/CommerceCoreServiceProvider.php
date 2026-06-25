@@ -39,6 +39,7 @@ use Lalalili\CommerceCore\Services\ScheduledCouponTemplatePayloadBuilder;
 use Lalalili\CommerceCore\Support\ModelAttributeMapper;
 use Lalalili\CommerceCore\Support\OrderItemNormalizer;
 use Lalalili\CommerceCore\Support\OrderNumberGenerator;
+use Lalalili\CommerceCore\Support\QueryBuilderHelper;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 
@@ -59,6 +60,7 @@ class CommerceCoreServiceProvider extends PackageServiceProvider
         $this->app->singleton(ModelAttributeMapper::class);
         $this->app->singleton(OrderItemNormalizer::class);
         $this->app->singleton(OrderNumberGenerator::class);
+        $this->app->singleton(QueryBuilderHelper::class);
         $this->app->singleton(CartItemAttributeNormalizer::class);
         $this->app->singleton(CartPromotionLineResolver::class);
         $this->app->singleton(CartPromotionRefreshInputFactoryService::class);
