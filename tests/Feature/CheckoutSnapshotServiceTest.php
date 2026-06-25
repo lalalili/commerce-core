@@ -337,6 +337,25 @@ it('builds reusable checkout failure log context', function (): void {
     ]);
 });
 
+it('reads request values with safe fallbacks for host snapshots', function (): void {
+    $service = app(CheckoutSnapshotService::class);
+    $request = new CheckoutSnapshotFakeRequest([
+        'payment_type' => 'credit-card',
+        'mobile_code' => '',
+        'donation_code' => '123',
+    ]);
+    $throwingRequest = new CheckoutSnapshotThrowingRequest;
+
+    expect($service->requestInput($request, 'payment_type'))->toBe('credit-card')
+        ->and($service->requestInput($request, 'missing', 'fallback'))->toBe('fallback')
+        ->and($service->requestInput(new stdClass, 'missing', 'fallback'))->toBe('fallback')
+        ->and($service->requestInput($throwingRequest, 'payment_type', 'fallback'))->toBe('fallback')
+        ->and($service->requestFilled($request, 'donation_code'))->toBeTrue()
+        ->and($service->requestFilled($request, 'mobile_code'))->toBeFalse()
+        ->and($service->requestFilled(new stdClass, 'missing', true))->toBeTrue()
+        ->and($service->requestFilled($throwingRequest, 'payment_type', true))->toBeTrue();
+});
+
 class CheckoutSnapshotFakeCart
 {
     public function __construct(
@@ -364,6 +383,34 @@ class CheckoutSnapshotFakeCart
     public function getTotal(bool $formatted = false): mixed
     {
         return $this->total;
+    }
+}
+
+class CheckoutSnapshotFakeRequest
+{
+    public function __construct(private readonly array $input) {}
+
+    public function input(string $key, mixed $default = null): mixed
+    {
+        return $this->input[$key] ?? $default;
+    }
+
+    public function filled(string $key): bool
+    {
+        return ($this->input[$key] ?? null) !== null && $this->input[$key] !== '';
+    }
+}
+
+class CheckoutSnapshotThrowingRequest
+{
+    public function input(string $key, mixed $default = null): mixed
+    {
+        throw new RuntimeException('request unavailable');
+    }
+
+    public function filled(string $key): bool
+    {
+        throw new RuntimeException('request unavailable');
     }
 }
 

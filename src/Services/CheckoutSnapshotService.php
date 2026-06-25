@@ -289,6 +289,32 @@ class CheckoutSnapshotService
         ], $extra);
     }
 
+    public function requestInput(mixed $request, string $key, mixed $default = null): mixed
+    {
+        if (! is_object($request) || ! method_exists($request, 'input')) {
+            return $default;
+        }
+
+        try {
+            return $request->input($key, $default);
+        } catch (Throwable) {
+            return $default;
+        }
+    }
+
+    public function requestFilled(mixed $request, string $key, bool $default = false): bool
+    {
+        if (! is_object($request) || ! method_exists($request, 'filled')) {
+            return $default;
+        }
+
+        try {
+            return (bool) $request->filled($key);
+        } catch (Throwable) {
+            return $default;
+        }
+    }
+
     /**
      * @param  array<string, mixed>  $payload
      */
