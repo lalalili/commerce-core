@@ -261,6 +261,46 @@ it('keeps array values in order detail rows when the host schema requires arrays
         ->and($service->detailTotal($rows, 'list_price', 'qty'))->toBe(1200);
 });
 
+it('builds reusable checkout snapshot persistence attributes', function (): void {
+    $service = app(CheckoutSnapshotService::class);
+    $capturedAt = now()->setDate(2026, 6, 25)->setTime(10, 30);
+    $payload = [
+        'order' => ['number' => 'O-001'],
+        'line_snapshots' => [['product_number' => 'P001']],
+    ];
+
+    $attributes = $service->checkoutSnapshotAttributes(
+        orderId: 99,
+        userId: 5,
+        lineSnapshots: [
+            ['sales_price' => 850, 'quantity' => 2],
+        ],
+        cartSnapshot: [
+            'total' => 1700,
+            'hash' => 'cart-hash',
+        ],
+        payload: $payload,
+        capturedAt: $capturedAt,
+        extra: [
+            'submission_id' => 'SUB-001',
+        ],
+    );
+
+    expect($attributes)->toBe([
+        'order_id' => 99,
+        'user_id' => 5,
+        'snapshot_version' => 1,
+        'line_count' => 1,
+        'cart_total' => 1700,
+        'detail_total' => 1700,
+        'payload' => $payload,
+        'cart_hash' => 'cart-hash',
+        'payload_hash' => $service->hashPayload($payload),
+        'captured_at' => $capturedAt,
+        'submission_id' => 'SUB-001',
+    ]);
+});
+
 class CheckoutSnapshotFakeCart
 {
     public function __construct(

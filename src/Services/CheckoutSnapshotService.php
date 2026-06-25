@@ -234,6 +234,38 @@ class CheckoutSnapshotService
     }
 
     /**
+     * @param  list<array<string, mixed>>  $lineSnapshots
+     * @param  array<string, mixed>  $cartSnapshot
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $extra
+     * @return array<string, mixed>
+     */
+    public function checkoutSnapshotAttributes(
+        int $orderId,
+        ?int $userId,
+        array $lineSnapshots,
+        array $cartSnapshot,
+        array $payload,
+        CarbonInterface $capturedAt,
+        int $snapshotVersion = 1,
+        ?int $detailTotal = null,
+        array $extra = [],
+    ): array {
+        return array_merge([
+            'order_id' => $orderId,
+            'user_id' => $userId,
+            'snapshot_version' => $snapshotVersion,
+            'line_count' => count($lineSnapshots),
+            'cart_total' => $cartSnapshot['total'] ?? null,
+            'detail_total' => $detailTotal ?? $this->detailTotal($lineSnapshots),
+            'payload' => $payload,
+            'cart_hash' => $cartSnapshot['hash'] ?? null,
+            'payload_hash' => $this->hashPayload($payload),
+            'captured_at' => $capturedAt,
+        ], $extra);
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      */
     public function hashPayload(array $payload): string
