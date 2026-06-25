@@ -16,6 +16,7 @@ use Lalalili\CommerceCore\Services\CouponCheckoutAdapterService;
 use Lalalili\CommerceCore\Services\CouponCodeGenerationPolicy;
 use Lalalili\CommerceCore\Services\CouponDataPayloadResolver;
 use Lalalili\CommerceCore\Services\CouponEligibilityCartDataFactory;
+use Lalalili\CommerceCore\Services\CouponFormPayloadBuilder;
 use Lalalili\CommerceCore\Services\CouponInventoryService;
 use Lalalili\CommerceCore\Services\CouponPricingTraceContextService;
 use Lalalili\CommerceCore\Services\CouponPricingTraceEntryFactory;
@@ -72,6 +73,7 @@ class CommerceCoreServiceProvider extends PackageServiceProvider
         $this->app->singleton(CouponCodeGenerationPolicy::class);
         $this->app->singleton(CouponDataPayloadResolver::class);
         $this->app->singleton(CouponEligibilityCartDataFactory::class);
+        $this->app->singleton(CouponFormPayloadBuilder::class);
         $this->app->singleton(CouponInventoryService::class);
         $this->app->singleton(CouponPricingTraceEntryFactory::class);
         $this->app->singleton(CouponPricingTraceContextService::class);

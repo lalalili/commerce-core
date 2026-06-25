@@ -14,6 +14,7 @@ use Lalalili\CommerceCore\Services\CouponCheckoutAdapterService;
 use Lalalili\CommerceCore\Services\CouponCodeGenerationPolicy;
 use Lalalili\CommerceCore\Services\CouponDataPayloadResolver;
 use Lalalili\CommerceCore\Services\CouponEligibilityCartDataFactory;
+use Lalalili\CommerceCore\Services\CouponFormPayloadBuilder;
 use Lalalili\CommerceCore\Services\CouponInventoryService;
 use Lalalili\CommerceCore\Services\CouponPricingTraceContextService;
 use Lalalili\CommerceCore\Services\CouponPricingTraceEntryFactory;
@@ -57,6 +58,7 @@ it('registers reusable commerce services as singletons', function (string $abstr
     CouponCodeGenerationPolicy::class,
     CouponDataPayloadResolver::class,
     CouponEligibilityCartDataFactory::class,
+    CouponFormPayloadBuilder::class,
     CouponInventoryService::class,
     CouponPricingTraceEntryFactory::class,
     CouponPricingTraceContextService::class,
