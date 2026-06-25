@@ -36,6 +36,33 @@ class PaymentLogService
     }
 
     /**
+     * @param  list<mixed>  $successfulStatusCodes
+     */
+    public function responseValue(
+        string $orderNumber,
+        string $responsePath,
+        array $successfulStatusCodes = [0, 11],
+    ): string {
+        /** @var class-string<Model> $paymentLogModel */
+        $paymentLogModel = $this->paymentLogModel();
+
+        /** @var Model|null $log */
+        $log = $paymentLogModel::query()
+            ->where('order_number', $orderNumber)
+            ->whereIn('status_code', $successfulStatusCodes)
+            ->first();
+
+        $response = $log?->getAttribute('response');
+        if (! is_array($response)) {
+            return '';
+        }
+
+        $value = data_get($response, $responsePath);
+
+        return is_scalar($value) ? (string) $value : '';
+    }
+
+    /**
      * @return class-string<Model>
      */
     private function paymentLogModel(): string
