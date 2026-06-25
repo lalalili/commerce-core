@@ -291,6 +291,50 @@ class OrderLifecycleService
         return $order;
     }
 
+    public function markWaitingForShipping(
+        string $orderNumber,
+        int|string|null $updatedBy = null,
+        string $orderStatusKey = 'order.paid',
+        ?string $invoiceStatusKey = 'invoice.pending',
+    ): ?Model {
+        /** @var class-string<Order> $orderModel */
+        $orderModel = config('commerce.models.order', Order::class);
+
+        return DB::transaction(function () use ($orderNumber, $updatedBy, $orderStatusKey, $invoiceStatusKey, $orderModel): ?Model {
+            /** @var Model|null $order */
+            $order = $orderModel::query()
+                ->where('number', $orderNumber)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $order instanceof Model) {
+                return null;
+            }
+
+            $waitingStatus = $this->status($orderStatusKey);
+            $actor = $updatedBy ?? data_get($order, 'user_id');
+
+            $order->update($this->attributes->filterForModel($orderModel, $this->attributes->map('orders', [
+                'status' => $waitingStatus,
+                'updated_by' => $actor,
+            ])));
+
+            $order->{$this->detailsRelation()}()->update($this->attributes->filterForModel($this->detailModel(), $this->attributes->map('order_details', [
+                'status' => $waitingStatus,
+                'updated_by' => $actor,
+            ])));
+
+            if ($invoiceStatusKey !== null) {
+                $order->{$this->invoicesRelation()}()->update($this->attributes->filterForModel($this->invoiceModel(), $this->attributes->map('order_invoices', [
+                    'status' => $this->status($invoiceStatusKey),
+                    'updated_by' => $actor,
+                ])));
+            }
+
+            return $order->refresh();
+        });
+    }
+
     /**
      * @param  list<mixed>  $allowedFromStatuses
      */

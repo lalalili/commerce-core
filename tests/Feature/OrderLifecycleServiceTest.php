@@ -477,6 +477,54 @@ it('does not mark orders as shipped when the current status is not allowed', fun
     expect(RecordingLifecycleHook::$events)->toBe([]);
 });
 
+it('marks orders as waiting for shipping and resets invoices to pending', function (): void {
+    $service = app(OrderLifecycleService::class);
+    $product = Product::query()->create([
+        'title' => 'Waiting shipment course',
+        'type' => 1,
+        'list_price' => 1000,
+        'sales_price' => 1000,
+        'tax' => 1,
+    ]);
+    $order = $service->create(1, [['product_id' => $product->id]], ['number' => '260510WAIT']);
+
+    OrderInvoice::query()->create([
+        'user_id' => 1,
+        'order_id' => $order->getKey(),
+        'order_number' => $order->number,
+        'total_sales_price' => 1000,
+        'type' => 1,
+        'number' => null,
+        'status' => InvoiceStatus::Cancelled,
+        'updated_by' => 9,
+    ]);
+
+    $waiting = $service->markWaitingForShipping($order->number, 8);
+
+    expect($waiting?->status)->toBe(OrderStatus::Complete)
+        ->and($waiting?->details()->pluck('status')->unique()->values()->all())->toBe([OrderStatus::Complete])
+        ->and(OrderInvoice::query()->where('order_number', $order->number)->pluck('status')->unique()->values()->all())
+        ->toBe([InvoiceStatus::Pending]);
+});
+
+it('can mark orders waiting for shipping with a host supplied order status key', function (): void {
+    $service = app(OrderLifecycleService::class);
+    $product = Product::query()->create([
+        'title' => 'Host pending course',
+        'type' => 1,
+        'list_price' => 1000,
+        'sales_price' => 1000,
+        'tax' => 1,
+    ]);
+    $order = $service->create(1, [['product_id' => $product->id]], ['number' => '260510HPND']);
+    $service->markPaid($order->number, 'Succeeded', now(), 9);
+
+    $waiting = $service->markWaitingForShipping($order->number, 8, 'order.pending', null);
+
+    expect($waiting?->status)->toBe(OrderStatus::Pending)
+        ->and($waiting?->details()->pluck('status')->unique()->values()->all())->toBe([OrderStatus::Pending]);
+});
+
 it('marks orders as finished idempotently and dispatches fulfillment hooks once', function (): void {
     RecordingLifecycleHook::reset();
     Event::fake([OrderFinished::class]);
