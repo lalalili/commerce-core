@@ -42,6 +42,56 @@ it('does not append a discount line when the discount is empty', function (): vo
     ]))->toBe([]);
 });
 
+it('appends shipping and discount accounting lines', function (): void {
+    $service = app(OrderDetailAdjustmentService::class);
+
+    $details = $service->appendAccountingLines([
+        [
+            'product_number' => 'BOOK-1',
+            'sales_price' => 500,
+            'qty' => 1,
+        ],
+    ], 80, [
+        'product_number' => 'POS-1',
+        'product_title' => '折扣金額',
+        'qty' => 1,
+    ], [
+        'product_number' => '70000001',
+        'product_title' => '運費金額',
+        'qty' => 1,
+    ], 120);
+
+    expect($details)->toBe([
+        [
+            'product_number' => 'BOOK-1',
+            'sales_price' => 500,
+            'qty' => 1,
+        ],
+        [
+            'product_number' => '70000001',
+            'product_title' => '運費金額',
+            'qty' => 1,
+            'sales_price' => 120,
+        ],
+        [
+            'product_number' => 'POS-1',
+            'product_title' => '折扣金額',
+            'qty' => 1,
+            'sales_price' => -80,
+        ],
+    ]);
+});
+
+it('does not append empty shipping accounting lines', function (): void {
+    $service = app(OrderDetailAdjustmentService::class);
+
+    expect($service->appendAccountingLines([], 0, [
+        'product_number' => 'POS-1',
+    ], [
+        'product_number' => '70000001',
+    ], 0))->toBe([]);
+});
+
 it('puts the whole discount in the taxable bucket when taxable total covers it', function (): void {
     $service = app(OrderDetailAdjustmentService::class);
 

@@ -40,6 +40,28 @@ class OrderDetailAdjustmentService
     }
 
     /**
+     * @param  list<array<string, mixed>>  $details
+     * @param  array<string, mixed>  $discountLine
+     * @param  array<string, mixed>|null  $shippingLine
+     * @return list<array<string, mixed>>
+     */
+    public function appendAccountingLines(
+        array $details,
+        mixed $discountAmount,
+        array $discountLine,
+        ?array $shippingLine = null,
+        mixed $shippingAmount = 0,
+        string $amountKey = 'sales_price',
+    ): array {
+        $shipping = $this->positiveAmount($shippingAmount);
+        if ($shippingLine !== null && $shipping > 0) {
+            $details[] = $this->lineWithAmount($shippingLine, $shipping, $amountKey);
+        }
+
+        return $this->appendDiscountLine($details, $discountAmount, $discountLine, $amountKey);
+    }
+
+    /**
      * @param  array<string, mixed>  $line
      * @return array<int|string, list<array<string, mixed>>>
      */
