@@ -37,6 +37,70 @@ it('normalizes order details by tax group', function (): void {
     ]);
 });
 
+it('groups order details by tax bucket and splits discounts by taxable amount', function (): void {
+    $service = app(OrderInvoiceTaxGroupService::class);
+
+    $groups = $service->groupDetailsByTaxBucket(
+        [
+            [
+                'detail' => ['product_title' => 'Tax free item', 'sales_price' => 100, 'qty' => 1],
+                'tax_type' => 0,
+                'taxable_amount' => 0,
+            ],
+            [
+                'detail' => ['product_title' => 'Taxed item', 'sales_price' => 80, 'qty' => 2],
+                'tax_type' => 1,
+                'taxable_amount' => 160,
+            ],
+        ],
+        200,
+        ['product_title' => '折扣金額', 'qty' => 1],
+        [
+            'shipping_line' => ['product_title' => '運費金額', 'sales_price' => 40, 'qty' => 1],
+            'shipping_amount' => 40,
+        ],
+    );
+
+    expect($groups)->toBe([
+        0 => [
+            ['product_title' => 'Tax free item', 'sales_price' => 100, 'qty' => 1],
+        ],
+        1 => [
+            ['product_title' => 'Taxed item', 'sales_price' => 80, 'qty' => 2],
+            ['product_title' => '運費金額', 'sales_price' => 40, 'qty' => 1],
+            ['product_title' => '折扣金額', 'qty' => 1, 'sales_price' => -200],
+        ],
+    ]);
+});
+
+it('groups all order details into a forced tax bucket', function (): void {
+    $service = app(OrderInvoiceTaxGroupService::class);
+
+    $groups = $service->groupDetailsByTaxBucket(
+        [
+            [
+                'detail' => ['product_title' => 'Export item', 'sales_price' => 100, 'qty' => 1],
+                'tax_type' => 1,
+            ],
+        ],
+        20,
+        ['product_title' => '折扣金額', 'qty' => 1],
+        [
+            'force_tax_type' => 2,
+            'shipping_line' => ['product_title' => '運費金額', 'sales_price' => 50, 'qty' => 1],
+            'shipping_amount' => 50,
+        ],
+    );
+
+    expect($groups)->toBe([
+        2 => [
+            ['product_title' => 'Export item', 'sales_price' => 100, 'qty' => 1],
+            ['product_title' => '運費金額', 'sales_price' => 50, 'qty' => 1],
+            ['product_title' => '折扣金額', 'qty' => 1, 'sales_price' => -20],
+        ],
+    ]);
+});
+
 it('issues each normalized tax group through a host issuer callback', function (): void {
     $service = app(OrderInvoiceTaxGroupService::class);
     $order = Order::query()->create(['number' => 'OD10002', 'user_id' => 1]);
