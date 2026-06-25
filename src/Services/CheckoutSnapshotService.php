@@ -431,6 +431,49 @@ class CheckoutSnapshotService
         }
     }
 
+    /**
+     * @param  array<int|string, string|array{source?:string, filled?:bool, default?:mixed}>  $fields
+     * @return array<string, mixed>
+     */
+    public function requestSnapshot(mixed $request, array $fields): array
+    {
+        $snapshot = [];
+
+        foreach ($fields as $outputKey => $definition) {
+            if (is_int($outputKey)) {
+                if (! is_string($definition)) {
+                    continue;
+                }
+
+                $outputKey = (string) $definition;
+                $definition = [];
+            }
+
+            if (is_string($definition)) {
+                $definition = ['source' => $definition];
+            }
+
+            $sourceKey = (string) ($definition['source'] ?? $outputKey);
+            if (($definition['filled'] ?? false) === true) {
+                $snapshot[$outputKey] = $this->requestFilled(
+                    $request,
+                    $sourceKey,
+                    (bool) ($definition['default'] ?? false)
+                );
+
+                continue;
+            }
+
+            $snapshot[$outputKey] = $this->requestInput(
+                $request,
+                $sourceKey,
+                $definition['default'] ?? null
+            );
+        }
+
+        return $snapshot;
+    }
+
     public function requestFilled(mixed $request, string $key, bool $default = false): bool
     {
         if (! is_object($request) || ! method_exists($request, 'filled')) {

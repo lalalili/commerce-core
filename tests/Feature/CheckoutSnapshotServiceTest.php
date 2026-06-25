@@ -507,6 +507,37 @@ it('reads request values with safe fallbacks for host snapshots', function (): v
         ->and($service->requestFilled($throwingRequest, 'payment_type', true))->toBeTrue();
 });
 
+it('builds request snapshots from host supplied field schemas', function (): void {
+    $service = app(CheckoutSnapshotService::class);
+    $request = new CheckoutSnapshotFakeRequest([
+        'submission_id' => 'abc-123',
+        'pay_type' => 'credit_card',
+        'mobile_code' => '',
+        'triplicate_number' => '12345678',
+    ]);
+
+    expect($service->requestSnapshot($request, [
+        'submission_id' => ['default' => ''],
+        'payment_type' => 'pay_type',
+        'has_mobile_code' => ['source' => 'mobile_code', 'filled' => true],
+        'has_triplicate_number' => ['source' => 'triplicate_number', 'filled' => true],
+        'missing' => ['default' => 'fallback'],
+    ]))->toBe([
+        'submission_id' => 'abc-123',
+        'payment_type' => 'credit_card',
+        'has_mobile_code' => false,
+        'has_triplicate_number' => true,
+        'missing' => 'fallback',
+    ])
+        ->and($service->requestSnapshot(new CheckoutSnapshotThrowingRequest, [
+            'payment_type' => ['default' => 'fallback'],
+            'has_mobile_code' => ['source' => 'mobile_code', 'filled' => true, 'default' => true],
+        ]))->toBe([
+            'payment_type' => 'fallback',
+            'has_mobile_code' => true,
+        ]);
+});
+
 class CheckoutSnapshotFakeCart
 {
     public function __construct(
