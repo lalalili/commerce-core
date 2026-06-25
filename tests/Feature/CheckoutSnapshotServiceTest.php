@@ -1,6 +1,9 @@
 <?php
 
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 use Lalalili\CommerceCore\Services\CheckoutSnapshotService;
 
 enum CheckoutSnapshotFakeProductType: int
@@ -893,6 +896,136 @@ it('builds reusable checkout success snapshot records', function (): void {
         ]);
 });
 
+it('persists reusable checkout success snapshot records through a host model', function (): void {
+    Schema::create('checkout_snapshot_test_records', function (Blueprint $table): void {
+        $table->id();
+        $table->string('order_number')->unique();
+        $table->unsignedInteger('order_id');
+        $table->unsignedInteger('user_id')->nullable();
+        $table->unsignedInteger('snapshot_version');
+        $table->unsignedInteger('line_count');
+        $table->integer('cart_total')->nullable();
+        $table->integer('detail_total');
+        $table->json('payload');
+        $table->string('cart_hash')->nullable();
+        $table->string('payload_hash');
+        $table->string('submission_id')->nullable();
+        $table->timestamp('captured_at')->nullable();
+        $table->timestamps();
+    });
+
+    $service = app(CheckoutSnapshotService::class);
+    $capturedAt = now()->setDate(2026, 6, 25)->setTime(12, 20);
+    $request = new CheckoutSnapshotFakeRequest([
+        'pay_type' => 'credit_card',
+    ]);
+    $cart = new CheckoutSnapshotFakeCart(
+        items: [
+            new CheckoutSnapshotFakeItem(
+                id: 'P001',
+                name: 'Test Product',
+                price: 500,
+                quantity: 2,
+                attributes: ['prod_no' => 'P001'],
+                conditions: [],
+            ),
+        ],
+        conditions: [],
+        subtotal: 1000,
+        total: 900,
+    );
+
+    $record = $service->persistCheckoutSuccessSnapshotRecord(
+        snapshotModel: CheckoutSnapshotTestRecord::class,
+        request: $request,
+        cart: $cart,
+        order: [
+            'number' => 'O-001',
+            'submission_id' => 'SUB-1',
+            'total_sales_price' => '900',
+        ],
+        orderId: 99,
+        userId: 5,
+        lineSnapshots: [
+            [
+                'product_number' => 'P001',
+                'quantity' => 2,
+                'sales_price' => '450',
+            ],
+        ],
+        capturedAt: $capturedAt,
+        orderSchema: [
+            'number',
+            'submission_id',
+            'total_sales_price',
+        ],
+        requestSchema: [
+            'payment_type' => 'pay_type',
+        ],
+        lineSnapshotSchema: [
+            'product_number' => ['type' => 'string', 'default' => ''],
+            'quantity' => ['type' => 'int', 'default' => 0],
+            'sales_price' => ['type' => 'string', 'default' => ''],
+        ],
+        options: [
+            'cart_item_attribute_keys' => ['prod_no'],
+            'attribute_extra' => [
+                'submission_id' => 'SUB-1',
+            ],
+        ],
+    );
+
+    $service->persistCheckoutSuccessSnapshotRecord(
+        snapshotModel: CheckoutSnapshotTestRecord::class,
+        request: $request,
+        cart: $cart,
+        order: [
+            'number' => 'O-001',
+            'submission_id' => 'SUB-1',
+            'total_sales_price' => '1000',
+        ],
+        orderId: 99,
+        userId: 7,
+        lineSnapshots: [
+            [
+                'product_number' => 'P001',
+                'quantity' => 2,
+                'sales_price' => '500',
+            ],
+        ],
+        capturedAt: $capturedAt,
+        orderSchema: [
+            'number',
+            'submission_id',
+            'total_sales_price',
+        ],
+        requestSchema: [
+            'payment_type' => 'pay_type',
+        ],
+        lineSnapshotSchema: [
+            'product_number' => ['type' => 'string', 'default' => ''],
+            'quantity' => ['type' => 'int', 'default' => 0],
+            'sales_price' => ['type' => 'string', 'default' => ''],
+        ],
+        options: [
+            'cart_item_attribute_keys' => ['prod_no'],
+            'attribute_extra' => [
+                'submission_id' => 'SUB-1',
+            ],
+        ],
+    );
+
+    $persisted = CheckoutSnapshotTestRecord::query()->sole();
+
+    expect($record['lookup'])->toBe(['order_number' => 'O-001'])
+        ->and($persisted->user_id)->toBe(7)
+        ->and($persisted->detail_total)->toBe(1000)
+        ->and($persisted->payload['order']['total_sales_price'])->toBe('1000')
+        ->and($persisted->payload['request'])->toBe([
+            'payment_type' => 'credit_card',
+        ]);
+});
+
 class CheckoutSnapshotFakeCart
 {
     public function __construct(
@@ -1008,5 +1141,22 @@ class CheckoutSnapshotFakeCondition
     public function getAttributes(): array
     {
         return $this->attributes;
+    }
+}
+
+class CheckoutSnapshotTestRecord extends Model
+{
+    protected $guarded = [];
+
+    protected $table = 'checkout_snapshot_test_records';
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'payload' => 'array',
+        ];
     }
 }

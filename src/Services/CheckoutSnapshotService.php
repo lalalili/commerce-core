@@ -4,7 +4,9 @@ namespace Lalalili\CommerceCore\Services;
 
 use BackedEnum;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use InvalidArgumentException;
 use Throwable;
 
 class CheckoutSnapshotService
@@ -614,6 +616,73 @@ class CheckoutSnapshotService
             'line_snapshots' => $normalizedLineSnapshots,
             'detail_total' => $detailTotal,
         ];
+    }
+
+    /**
+     * @param  class-string<Model>  $snapshotModel
+     * @param  array<string, mixed>  $order
+     * @param  array<int, array<string, mixed>>  $lineSnapshots
+     * @param  array<int|string, array{source?:string, type?:'array'|'bool'|'datetime'|'float'|'int'|'json'|'raw'|'string', default?:mixed}|string>  $orderSchema
+     * @param  array<int|string, array{source?:string, filled?:bool, default?:mixed}|string>  $requestSchema
+     * @param  array<string, array{source?:string, type?:'array'|'bool'|'datetime'|'float'|'int'|'json'|'raw'|'string', default?:mixed}>  $lineSnapshotSchema
+     * @param  array{
+     *     cart_item_attribute_keys?: list<string>,
+     *     condition_attribute_keys?: list<string>,
+     *     order_request_schema?: array<int|string, array{source?:string, filled?:bool, default?:mixed}|string>,
+     *     attribute_extra?: array<string, mixed>,
+     *     payload_extra?: array<string, mixed>,
+     *     snapshot_version?: int,
+     *     detail_total?: int,
+     *     order_number_key?: string,
+     *     order_number?: string
+     * }  $options
+     * @return array{
+     *     lookup: array{order_number: string},
+     *     attributes: array<string, mixed>,
+     *     payload: array<string, mixed>,
+     *     cart_snapshot: array<string, mixed>,
+     *     line_snapshots: list<array<string, mixed>>,
+     *     detail_total: int
+     * }
+     */
+    public function persistCheckoutSuccessSnapshotRecord(
+        string $snapshotModel,
+        mixed $request,
+        mixed $cart,
+        array $order,
+        int $orderId,
+        ?int $userId,
+        array $lineSnapshots,
+        CarbonInterface $capturedAt,
+        array $orderSchema,
+        array $requestSchema,
+        array $lineSnapshotSchema,
+        array $options = [],
+    ): array {
+        if (! is_subclass_of($snapshotModel, Model::class)) {
+            throw new InvalidArgumentException('Snapshot model must extend '.Model::class.'.');
+        }
+
+        $record = $this->checkoutSuccessSnapshotRecord(
+            request: $request,
+            cart: $cart,
+            order: $order,
+            orderId: $orderId,
+            userId: $userId,
+            lineSnapshots: $lineSnapshots,
+            capturedAt: $capturedAt,
+            orderSchema: $orderSchema,
+            requestSchema: $requestSchema,
+            lineSnapshotSchema: $lineSnapshotSchema,
+            options: $options,
+        );
+
+        $snapshotModel::query()->updateOrCreate(
+            $record['lookup'],
+            $record['attributes'],
+        );
+
+        return $record;
     }
 
     /**
