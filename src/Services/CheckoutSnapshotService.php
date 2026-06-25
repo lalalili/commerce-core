@@ -275,7 +275,7 @@ class CheckoutSnapshotService
 
     /**
      * @param  array<string, mixed>  $snapshot
-     * @param  array<string, array{source?:string, type?:'array'|'bool'|'datetime'|'float'|'int'|'json'|'raw'|'string', default?:mixed}|string>  $schema
+     * @param  array<int|string, array{source?:string, type?:'array'|'bool'|'datetime'|'float'|'int'|'json'|'raw'|'string', default?:mixed}|string>  $schema
      * @return array<string, mixed>
      */
     public function normalizeSnapshot(array $snapshot, array $schema): array
@@ -407,13 +407,13 @@ class CheckoutSnapshotService
     /**
      * @param  array<string, mixed>  $order
      * @param  array<int, array<string, mixed>>  $lineSnapshots
-     * @param  array<string, array{source?:string, type?:'array'|'bool'|'datetime'|'float'|'int'|'json'|'raw'|'string', default?:mixed}|string>  $orderSchema
-     * @param  array<string, array{source?:string, type?:'array'|'bool'|'datetime'|'float'|'int'|'json'|'raw'|'string', default?:mixed}|string>  $requestSchema
+     * @param  array<int|string, array{source?:string, type?:'array'|'bool'|'datetime'|'float'|'int'|'json'|'raw'|'string', default?:mixed}|string>  $orderSchema
+     * @param  array<int|string, array{source?:string, filled?:bool, default?:mixed}|string>  $requestSchema
      * @param  array<string, array{source?:string, type?:'array'|'bool'|'datetime'|'float'|'int'|'json'|'raw'|'string', default?:mixed}>  $lineSnapshotSchema
      * @param  array{
      *     cart_item_attribute_keys?: list<string>,
      *     condition_attribute_keys?: list<string>,
-     *     order_request_schema?: array<string, array{source?:string, type?:'array'|'bool'|'datetime'|'float'|'int'|'json'|'raw'|'string', default?:mixed, filled?:bool}|string>,
+     *     order_request_schema?: array<int|string, array{source?:string, filled?:bool, default?:mixed}|string>,
      *     attribute_extra?: array<string, mixed>,
      *     payload_extra?: array<string, mixed>,
      *     snapshot_version?: int,
