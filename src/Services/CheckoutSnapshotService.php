@@ -240,6 +240,56 @@ class CheckoutSnapshotService
         ];
     }
 
+    /**
+     * @return array{
+     *     totals: array{total_sales_price:int|string,total_discount_amt:int|string},
+     *     has_cart_items: bool,
+     *     has_positive_total: bool,
+     *     coupon_condition_mismatch: bool,
+     *     is_ready: bool
+     * }
+     */
+    public function checkoutConsistencySummary(
+        mixed $cart,
+        mixed $cartContent,
+        bool $hasMemberCouponCode,
+        bool $hasPromotionCouponCode,
+        bool $stringValues = false,
+        string $memberCouponConditionType = 'member_coupon',
+        string $promotionCouponConditionType = 'promotion_coupon',
+    ): array {
+        $totals = $this->checkoutTotals($cart, $stringValues);
+        $totalSalesPrice = $this->numericValue($totals['total_sales_price']) ?? 0;
+        $hasCartItems = $this->expectedCartLineCount($cartContent) > 0;
+        $couponConditionMismatch = $this->couponConditionMismatch(
+            hasMemberCouponCode: $hasMemberCouponCode,
+            memberCouponConditions: $this->cartConditionsByType($cart, $memberCouponConditionType),
+            hasPromotionCouponCode: $hasPromotionCouponCode,
+            promotionCouponConditions: $this->cartConditionsByType($cart, $promotionCouponConditionType),
+        );
+
+        return [
+            'totals' => $totals,
+            'has_cart_items' => $hasCartItems,
+            'has_positive_total' => (float) $totalSalesPrice >= 1,
+            'coupon_condition_mismatch' => $couponConditionMismatch,
+            'is_ready' => $hasCartItems && (float) $totalSalesPrice >= 1 && ! $couponConditionMismatch,
+        ];
+    }
+
+    public function cartConditionsByType(mixed $cart, string $type): mixed
+    {
+        if (! is_object($cart) || ! method_exists($cart, 'getConditionsByType')) {
+            return [];
+        }
+
+        try {
+            return $cart->getConditionsByType($type);
+        } catch (Throwable) {
+            return [];
+        }
+    }
+
     public function couponConditionMismatch(
         bool $hasMemberCouponCode,
         mixed $memberCouponConditions,

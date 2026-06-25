@@ -196,6 +196,61 @@ it('calculates checkout totals in host compatible formats', function (): void {
         ]);
 });
 
+it('summarizes checkout consistency for host order guards', function (): void {
+    $service = app(CheckoutSnapshotService::class);
+    $cart = new CheckoutSnapshotFakeCart(
+        items: [
+            new CheckoutSnapshotFakeItem(id: 'SKU-1', name: 'Course', price: 1000, quantity: 1, attributes: [], conditions: []),
+        ],
+        conditions: [
+            new CheckoutSnapshotFakeCondition('Member', 'member_coupon', '-100', []),
+            new CheckoutSnapshotFakeCondition('Promotion', 'promotion_coupon', '-50', []),
+        ],
+        subtotal: '1000',
+        total: '850',
+    );
+
+    expect($service->checkoutConsistencySummary(
+        cart: $cart,
+        cartContent: $cart->getContent(),
+        hasMemberCouponCode: true,
+        hasPromotionCouponCode: true,
+        stringValues: true,
+    ))->toBe([
+        'totals' => [
+            'total_sales_price' => '850',
+            'total_discount_amt' => '150',
+        ],
+        'has_cart_items' => true,
+        'has_positive_total' => true,
+        'coupon_condition_mismatch' => false,
+        'is_ready' => true,
+    ])
+        ->and($service->checkoutConsistencySummary(
+            cart: $cart,
+            cartContent: [],
+            hasMemberCouponCode: false,
+            hasPromotionCouponCode: true,
+        ))->toMatchArray([
+            'has_cart_items' => false,
+            'coupon_condition_mismatch' => true,
+            'is_ready' => false,
+        ])
+        ->and($service->checkoutConsistencySummary(
+            cart: new CheckoutSnapshotFakeCart(items: $cart->getContent(), conditions: [], subtotal: 1000, total: 0),
+            cartContent: $cart->getContent(),
+            hasMemberCouponCode: false,
+            hasPromotionCouponCode: false,
+        ))->toMatchArray([
+            'totals' => [
+                'total_sales_price' => 0,
+                'total_discount_amt' => 1000,
+            ],
+            'has_positive_total' => false,
+            'is_ready' => false,
+        ]);
+});
+
 it('detects coupon code and cart condition mismatches', function (): void {
     $service = app(CheckoutSnapshotService::class);
     $memberConditions = [
@@ -675,6 +730,14 @@ class CheckoutSnapshotFakeCart
     public function getConditions(): mixed
     {
         return $this->conditions;
+    }
+
+    public function getConditionsByType(string $type): array
+    {
+        return collect($this->conditions)
+            ->filter(fn (mixed $condition): bool => $condition instanceof CheckoutSnapshotFakeCondition && $condition->getType() === $type)
+            ->values()
+            ->all();
     }
 
     public function getSubTotal(bool $formatted = false): mixed
