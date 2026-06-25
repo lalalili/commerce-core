@@ -266,6 +266,35 @@ class CheckoutSnapshotService
     }
 
     /**
+     * @param  array<string, mixed>  $orderSnapshot
+     * @param  array<string, mixed>  $requestSnapshot
+     * @param  array<string, mixed>  $cartSnapshot
+     * @param  list<array<string, mixed>>  $lineSnapshots
+     * @param  array<string, mixed>  $extra
+     * @return array<string, mixed>
+     */
+    public function checkoutSuccessPayload(
+        array $orderSnapshot,
+        array $requestSnapshot,
+        array $cartSnapshot,
+        array $lineSnapshots,
+        int $detailTotal,
+        CarbonInterface $capturedAt,
+        int $snapshotVersion = 1,
+        array $extra = [],
+    ): array {
+        return array_merge([
+            'snapshot_version' => $snapshotVersion,
+            'captured_at' => $capturedAt->toDateTimeString(),
+            'order' => $orderSnapshot,
+            'request' => $requestSnapshot,
+            'checkout_cart' => $cartSnapshot,
+            'line_snapshots' => $lineSnapshots,
+            'detail_total' => $detailTotal,
+        ], $extra);
+    }
+
+    /**
      * @param  array<string, mixed>  $requestSnapshot
      * @param  array<string, mixed>  $cartContext
      * @param  array<string, mixed>  $extra

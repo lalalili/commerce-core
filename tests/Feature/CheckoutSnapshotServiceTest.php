@@ -301,6 +301,50 @@ it('builds reusable checkout snapshot persistence attributes', function (): void
     ]);
 });
 
+it('builds reusable checkout success payloads from host snapshots', function (): void {
+    $service = app(CheckoutSnapshotService::class);
+    $capturedAt = now()->setDate(2026, 6, 25)->setTime(11, 15);
+    $orderSnapshot = [
+        'id' => 99,
+        'number' => 'O-001',
+    ];
+    $requestSnapshot = [
+        'payment_type' => 'credit-card',
+    ];
+    $cartSnapshot = [
+        'total' => 1700,
+    ];
+    $lineSnapshots = [
+        [
+            'product_number' => 'P001',
+            'quantity' => 2,
+        ],
+    ];
+
+    $payload = $service->checkoutSuccessPayload(
+        orderSnapshot: $orderSnapshot,
+        requestSnapshot: $requestSnapshot,
+        cartSnapshot: $cartSnapshot,
+        lineSnapshots: $lineSnapshots,
+        detailTotal: 1700,
+        capturedAt: $capturedAt,
+        extra: [
+            'source' => 'checkout',
+        ],
+    );
+
+    expect($payload)->toBe([
+        'snapshot_version' => 1,
+        'captured_at' => '2026-06-25 11:15:00',
+        'order' => $orderSnapshot,
+        'request' => $requestSnapshot,
+        'checkout_cart' => $cartSnapshot,
+        'line_snapshots' => $lineSnapshots,
+        'detail_total' => 1700,
+        'source' => 'checkout',
+    ]);
+});
+
 it('builds reusable checkout failure log context', function (): void {
     $service = app(CheckoutSnapshotService::class);
     $capturedAt = now()->setDate(2026, 6, 25)->setTime(11, 45);
