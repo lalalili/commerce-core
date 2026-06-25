@@ -33,17 +33,16 @@ it('builds issued member coupon payloads with carbon dates for cptw style hosts'
         ],
     );
 
-    expect($payload)
-        ->title->toBe('生日禮')
-        ->code->toBe('BIRTHDAY123')
-        ->amount->toBe(100)
-        ->trigger_amount->toBe(500)
-        ->type->toBe(1)
-        ->scope->toBe(2)
-        ->scope_products->toBe([10, 20])
-        ->user_id->toBe(123)
-        ->status->toBe(1)
-        ->created_by->toBe('CouponForBirthday')
+    expect($payload['title'])->toBe('生日禮')
+        ->and($payload['code'])->toBe('BIRTHDAY123')
+        ->and($payload['amount'])->toBe(100)
+        ->and($payload['trigger_amount'])->toBe(500)
+        ->and($payload['type'])->toBe(1)
+        ->and($payload['scope'])->toBe(2)
+        ->and($payload['scope_products'])->toBe([10, 20])
+        ->and($payload['user_id'])->toBe(123)
+        ->and($payload['status'])->toBe(1)
+        ->and($payload['created_by'])->toBe('CouponForBirthday')
         ->and($payload['start_date'])->toBe($now)
         ->and($payload['created_at'])->toBe($now)
         ->and($payload['end_date']?->toDateTimeString())->toBe('2026-07-02 10:15:00')
@@ -121,8 +120,8 @@ it('can resolve start dates from scheduled template effective days when hosts op
         ],
     );
 
-    expect($payload['start_date']?->toDateTimeString())->toBe('2026-06-27 10:15:00')
-        ->and($builder->resolveStartDate(3, $now)->toDateTimeString())->toBe('2026-06-28 10:15:00')
+    expect($payload['start_date'])->toEqual($now->addDays(2))
+        ->and($builder->resolveStartDate(3, $now))->toEqual($now->addDays(3))
         ->and($builder->resolveStartDate(null, $now))->toBe($now)
         ->and($builder->resolveStartDate(3, '2026-06-25 10:15:00'))->toBe('2026-06-25 10:15:00');
 });
@@ -144,4 +143,54 @@ it('normalizes nullable and json scope products', function (): void {
         ->and($builder->resolveScopeProducts('[1,2]', true))->toBe([1, 2])
         ->and($builder->resolveScopeProducts('invalid', true))->toBeNull()
         ->and($builder->resolveScopeProducts('raw', false))->toBe('raw');
+});
+
+it('extracts scheduled template payload fields from arrays and objects', function (): void {
+    $builder = app(ScheduledCouponTemplatePayloadBuilder::class);
+
+    expect($builder->templatePayload([
+        'title' => '排程_註冊禮',
+        'amount' => 100,
+        'trigger_amount' => 500,
+        'scope' => 2,
+        'scope_products' => [],
+        'available_days' => 7,
+        'effective_days' => 1,
+    ]))->toBe([
+        'title' => '排程_註冊禮',
+        'amount' => 100,
+        'trigger_amount' => 500,
+        'scope' => 2,
+        'scope_products' => null,
+        'available_days' => 7,
+        'effective_days' => 1,
+    ]);
+
+    $template = (object) [
+        'name' => '排程_生日禮',
+        'discount_amount' => 80,
+        'threshold_amount' => 300,
+        'coupon_scope' => 1,
+        'product_ids' => [11, 22],
+        'valid_days' => 30,
+        'starts_after_days' => 2,
+    ];
+
+    expect($builder->templatePayload($template, [
+        'title' => 'name',
+        'amount' => 'discount_amount',
+        'trigger_amount' => 'threshold_amount',
+        'scope' => 'coupon_scope',
+        'scope_products' => 'product_ids',
+        'available_days' => 'valid_days',
+        'effective_days' => 'starts_after_days',
+    ]))->toBe([
+        'title' => '排程_生日禮',
+        'amount' => 80,
+        'trigger_amount' => 300,
+        'scope' => 1,
+        'scope_products' => [11, 22],
+        'available_days' => 30,
+        'effective_days' => 2,
+    ]);
 });

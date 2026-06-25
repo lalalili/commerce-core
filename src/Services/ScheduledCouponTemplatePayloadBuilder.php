@@ -8,6 +8,54 @@ use Carbon\CarbonInterface;
 class ScheduledCouponTemplatePayloadBuilder
 {
     /**
+     * @param  array<string, string>  $keys
+     * @return array{
+     *     title: mixed,
+     *     amount: mixed,
+     *     trigger_amount: mixed,
+     *     scope: mixed,
+     *     scope_products: mixed,
+     *     available_days: mixed,
+     *     effective_days: mixed
+     * }
+     */
+    public function templatePayload(mixed $template, array $keys = [], bool $scopeProductsEmptyAsNull = true): array
+    {
+        $keys = array_merge([
+            'title' => 'title',
+            'amount' => 'amount',
+            'trigger_amount' => 'trigger_amount',
+            'scope' => 'scope',
+            'scope_products' => 'scope_products',
+            'available_days' => 'available_days',
+            'effective_days' => 'effective_days',
+        ], $keys);
+
+        $payload = [
+            'title' => data_get($template, $keys['title']),
+            'amount' => data_get($template, $keys['amount']),
+            'trigger_amount' => data_get($template, $keys['trigger_amount']),
+            'scope' => data_get($template, $keys['scope']),
+            'scope_products' => data_get($template, $keys['scope_products']),
+            'available_days' => data_get($template, $keys['available_days']),
+            'effective_days' => data_get($template, $keys['effective_days']),
+        ];
+
+        if (
+            $scopeProductsEmptyAsNull
+            && (
+                $payload['scope_products'] === null
+                || $payload['scope_products'] === ''
+                || $payload['scope_products'] === []
+            )
+        ) {
+            $payload['scope_products'] = null;
+        }
+
+        return $payload;
+    }
+
+    /**
      * @param  array<string, mixed>  $template
      * @param  array{
      *     title?: string|null,
