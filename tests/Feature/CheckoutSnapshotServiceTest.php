@@ -3,6 +3,11 @@
 use Illuminate\Support\Collection;
 use Lalalili\CommerceCore\Services\CheckoutSnapshotService;
 
+enum CheckoutSnapshotFakeProductType: int
+{
+    case Course = 3;
+}
+
 it('captures cart items, conditions, totals, and a stable hash', function (): void {
     $service = app(CheckoutSnapshotService::class);
     $cart = new CheckoutSnapshotFakeCart(
@@ -92,6 +97,50 @@ it('normalizes checkout line snapshots from a host supplied schema', function ()
         ],
     ])
         ->and($service->detailTotal($lines))->toBe(900);
+});
+
+it('extracts reusable cart line values for host line builders', function (): void {
+    $service = app(CheckoutSnapshotService::class);
+    $items = [
+        new CheckoutSnapshotFakeItem(
+            id: 'SKU-1',
+            name: 'Course',
+            price: '1000.40',
+            quantity: 2,
+            attributes: [],
+            conditions: [
+                new CheckoutSnapshotFakeCondition('Event A', 'rebate', '-100', [
+                    'event_id' => 11,
+                    'event_title' => 'Launch',
+                ]),
+                new CheckoutSnapshotFakeCondition('Event B', 'rebate', '-50', [
+                    'event_id' => 12,
+                    'event_title' => 'Bundle',
+                ]),
+            ],
+        ),
+        new CheckoutSnapshotFakeItem(
+            id: 'SKU-2',
+            name: 'Ignored',
+            price: '300',
+            quantity: 0,
+            attributes: [],
+            conditions: [],
+        ),
+    ];
+
+    $attributes = $service->cartLineConditionAttributes($items[0]);
+
+    expect($service->expectedCartLineCount($items))->toBe(1)
+        ->and($service->expectedCartLineCount(null))->toBe(0)
+        ->and($attributes)->toBe([
+            'event_id' => [11, 12],
+            'event_title' => ['Launch', 'Bundle'],
+        ])
+        ->and($service->cartItemPriceWithConditions($items[0]))->toBe(990.4)
+        ->and($service->moneyString($items[0]->price))->toBe('1000')
+        ->and($service->moneyString($service->cartItemPriceWithConditions($items[0])))->toBe('990')
+        ->and($service->enumValue(CheckoutSnapshotFakeProductType::Course))->toBe(3);
 });
 
 class CheckoutSnapshotFakeCart

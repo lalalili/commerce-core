@@ -2,6 +2,7 @@
 
 namespace Lalalili\CommerceCore\Services;
 
+use BackedEnum;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Throwable;
@@ -119,6 +120,69 @@ class CheckoutSnapshotService
         }
 
         return $conditions !== null ? [$conditions] : [];
+    }
+
+    /**
+     * @param  iterable<int, mixed>|mixed  $cartContent
+     */
+    public function expectedCartLineCount(mixed $cartContent): int
+    {
+        if (! is_iterable($cartContent)) {
+            return 0;
+        }
+
+        $count = 0;
+        foreach ($cartContent as $item) {
+            if ((int) data_get($item, 'quantity', 0) > 0) {
+                $count++;
+            }
+        }
+
+        return $count;
+    }
+
+    /**
+     * @param  list<string>  $attributeKeys
+     * @return array<string, list<mixed>>
+     */
+    public function cartLineConditionAttributes(mixed $item, array $attributeKeys = ['event_id', 'event_title']): array
+    {
+        $attributes = [];
+        foreach ($attributeKeys as $attributeKey) {
+            $attributes[$attributeKey] = [];
+        }
+
+        foreach ($this->normalizeConditions(data_get($item, 'conditions')) as $condition) {
+            if (! is_object($condition) || ! method_exists($condition, 'getAttributes')) {
+                continue;
+            }
+
+            $conditionAttributes = (array) $condition->getAttributes();
+            foreach ($attributeKeys as $attributeKey) {
+                $attributes[$attributeKey][] = data_get($conditionAttributes, $attributeKey);
+            }
+        }
+
+        return $attributes;
+    }
+
+    public function cartItemPriceWithConditions(mixed $item): int|float|null
+    {
+        if (! is_object($item) || ! method_exists($item, 'getPriceWithConditions')) {
+            return null;
+        }
+
+        return $this->numericCartValue(fn (): mixed => $item->getPriceWithConditions(false));
+    }
+
+    public function moneyString(mixed $value): string
+    {
+        return number_format((float) ($this->numericValue($value) ?? 0), 0, '.', '');
+    }
+
+    public function enumValue(mixed $value): mixed
+    {
+        return $value instanceof BackedEnum ? $value->value : $value;
     }
 
     /**
