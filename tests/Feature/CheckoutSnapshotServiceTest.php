@@ -156,6 +156,75 @@ it('extracts reusable cart line values for host line builders', function (): voi
         ->and($service->enumValue(CheckoutSnapshotFakeProductType::Course))->toBe(3);
 });
 
+it('builds cart line snapshots with host supplied mappers', function (): void {
+    $service = app(CheckoutSnapshotService::class);
+    $items = [
+        new CheckoutSnapshotFakeItem(
+            id: 'SKU-1',
+            name: 'Course &amp; Bundle',
+            price: '1000.40',
+            quantity: 2,
+            attributes: [
+                'company_id' => 7,
+            ],
+            conditions: [
+                new CheckoutSnapshotFakeCondition('Event A', 'rebate', '-100', [
+                    'event_id' => 11,
+                    'event_title' => 'Launch',
+                ]),
+            ],
+        ),
+        new CheckoutSnapshotFakeItem(
+            id: '',
+            name: 'Skipped',
+            price: '300',
+            quantity: 1,
+            attributes: [],
+            conditions: [],
+        ),
+    ];
+
+    $snapshots = $service->cartLineSnapshots(
+        $items,
+        static function (mixed $item, array $baseValues, CheckoutSnapshotService $snapshots): ?array {
+            $companyId = data_get($item, 'attributes.company_id');
+            if ($baseValues['id'] === '' || ! is_numeric($companyId)) {
+                return null;
+            }
+
+            return [
+                'product_id' => $baseValues['id'],
+                'company_id' => (int) $companyId,
+                'quantity' => $baseValues['quantity'],
+                'title' => $baseValues['title'],
+                'decoded_title' => $baseValues['decoded_title'],
+                'sales_price' => $baseValues['sales_price'],
+                'event_id' => $baseValues['condition_attributes']['event_id'] ?? [],
+                'helper_total' => $snapshots->detailTotal([
+                    [
+                        'sales_price' => $baseValues['sales_price'],
+                        'quantity' => $baseValues['quantity'],
+                    ],
+                ]),
+            ];
+        },
+    );
+
+    expect($snapshots)->toBe([
+        [
+            'product_id' => 'SKU-1',
+            'company_id' => 7,
+            'quantity' => 2,
+            'title' => 'Course &amp; Bundle',
+            'decoded_title' => 'Course & Bundle',
+            'sales_price' => '990',
+            'event_id' => [11],
+            'helper_total' => 1980,
+        ],
+    ])
+        ->and($service->cartLineSnapshots(null, static fn (): array => []))->toBe([]);
+});
+
 it('checks whether host cart line snapshots cover every checkout line', function (): void {
     $service = app(CheckoutSnapshotService::class);
     $items = [
