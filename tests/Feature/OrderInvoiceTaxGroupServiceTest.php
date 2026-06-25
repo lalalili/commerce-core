@@ -2,6 +2,8 @@
 
 use Illuminate\Database\Eloquent\Model;
 use Lalalili\CommerceCore\Models\Order;
+use Lalalili\CommerceCore\Models\OrderDetail;
+use Lalalili\CommerceCore\Models\Product;
 use Lalalili\CommerceCore\Services\OrderInvoiceTaxGroupService;
 
 it('parses order numbers with tax suffixes', function (): void {
@@ -109,6 +111,123 @@ it('groups all order details into a forced tax bucket', function (): void {
             'force_tax_type' => 2,
             'shipping_line' => ['product_title' => '運費金額', 'sales_price' => 50, 'qty' => 1],
             'shipping_amount' => 50,
+        ],
+    );
+
+    expect($groups)->toBe([
+        2 => [
+            ['product_title' => 'Export item', 'sales_price' => 100, 'qty' => 1],
+            ['product_title' => '運費金額', 'sales_price' => 50, 'qty' => 1],
+            ['product_title' => '折扣金額', 'qty' => 1, 'sales_price' => -20],
+        ],
+    ]);
+});
+
+it('builds tax groups directly from order details', function (): void {
+    $service = app(OrderInvoiceTaxGroupService::class);
+    $taxedProduct = Product::query()->create([
+        'title' => 'Taxed item',
+        'type' => 1,
+        'list_price' => 200,
+        'sales_price' => 180,
+        'tax' => 1,
+    ]);
+    $taxFreeProduct = Product::query()->create([
+        'title' => 'Tax free item',
+        'type' => 1,
+        'list_price' => 100,
+        'sales_price' => 90,
+        'tax' => 0,
+    ]);
+    $order = Order::query()->create([
+        'number' => 'OD10004',
+        'user_id' => 1,
+        'total_discount_amt' => 30,
+    ]);
+
+    OrderDetail::query()->create([
+        'order_id' => $order->id,
+        'order_number' => $order->number,
+        'product_id' => $taxedProduct->id,
+        'title' => 'Taxed item',
+        'qty' => 1,
+        'list_price' => 200,
+        'sales_price' => 180,
+        'status' => 0,
+    ]);
+    OrderDetail::query()->create([
+        'order_id' => $order->id,
+        'order_number' => $order->number,
+        'product_id' => $taxFreeProduct->id,
+        'title' => 'Tax free item',
+        'qty' => 1,
+        'list_price' => 100,
+        'sales_price' => 90,
+        'status' => 0,
+    ]);
+
+    $groups = $service->groupOrderDetailsByTaxBucket(
+        $order,
+        30,
+        ['product_title' => '折扣金額', 'qty' => 1],
+        ['taxable_amount_key' => 'list_price'],
+        fn (Model $detail): array => [
+            'title' => (string) $detail->getAttribute('title'),
+            'sales_price' => (int) $detail->getAttribute('sales_price'),
+            'qty' => (int) $detail->getAttribute('qty'),
+        ],
+    );
+
+    expect($groups)->toBe([
+        0 => [
+            ['title' => 'Tax free item', 'sales_price' => 90, 'qty' => 1],
+        ],
+        1 => [
+            ['title' => 'Taxed item', 'sales_price' => 180, 'qty' => 1],
+            ['product_title' => '折扣金額', 'qty' => 1, 'sales_price' => -30],
+        ],
+    ]);
+});
+
+it('can force order detail tax groups and append shipping from options', function (): void {
+    $service = app(OrderInvoiceTaxGroupService::class);
+    $product = Product::query()->create([
+        'title' => 'Export item',
+        'type' => 1,
+        'list_price' => 100,
+        'sales_price' => 100,
+        'tax' => 1,
+    ]);
+    $order = Order::query()->create([
+        'number' => 'OD10005',
+        'user_id' => 1,
+        'total_discount_amt' => 20,
+    ]);
+
+    OrderDetail::query()->create([
+        'order_id' => $order->id,
+        'order_number' => $order->number,
+        'product_id' => $product->id,
+        'title' => 'Export item',
+        'qty' => 1,
+        'list_price' => 100,
+        'sales_price' => 100,
+        'status' => 0,
+    ]);
+
+    $groups = $service->groupOrderDetailsByTaxBucket(
+        $order,
+        20,
+        ['product_title' => '折扣金額', 'qty' => 1],
+        [
+            'force_tax_type' => 2,
+            'shipping_line' => ['product_title' => '運費金額', 'sales_price' => 50, 'qty' => 1],
+            'shipping_amount' => 50,
+        ],
+        fn (Model $detail): array => [
+            'product_title' => (string) $detail->getAttribute('title'),
+            'sales_price' => (int) $detail->getAttribute('sales_price'),
+            'qty' => (int) $detail->getAttribute('qty'),
         ],
     );
 

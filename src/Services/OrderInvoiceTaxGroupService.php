@@ -3,10 +3,14 @@
 namespace Lalalili\CommerceCore\Services;
 
 use Illuminate\Database\Eloquent\Model;
+use Lalalili\CommerceCore\Support\ModelAttributeMapper;
 
 class OrderInvoiceTaxGroupService
 {
-    public function __construct(private readonly OrderDetailAdjustmentService $adjustments) {}
+    public function __construct(
+        private readonly OrderDetailAdjustmentService $adjustments,
+        private readonly ModelAttributeMapper $attributes,
+    ) {}
 
     /**
      * @return array{order_number: string, tax_type: int}|null
@@ -71,6 +75,75 @@ class OrderInvoiceTaxGroupService
         ksort($normalized);
 
         return $normalized;
+    }
+
+    /**
+     * @param  callable(Model): (array<string, mixed>|null)  $detailResolver
+     * @param  array{details_relation?: string, amount_key?: string, taxable_amount_key?: string}  $options
+     * @return list<array{detail: array<string, mixed>, tax_type: int, taxable_amount: int}>
+     */
+    public function orderDetailTaxItems(Model $order, ?callable $detailResolver = null, array $options = []): array
+    {
+        $detailsRelation = $this->detailsRelation($options);
+        $amountKey = $options['amount_key'] ?? 'sales_price';
+        $taxableAmountKey = $options['taxable_amount_key'] ?? $amountKey;
+
+        $order->loadMissing([$detailsRelation.'.product']);
+
+        $items = [];
+
+        foreach ($order->getRelationValue($detailsRelation) ?? [] as $detail) {
+            if (! $detail instanceof Model) {
+                continue;
+            }
+
+            $product = $detail->getRelationValue('product');
+
+            if (! $product instanceof Model) {
+                continue;
+            }
+
+            $detailPayload = $detailResolver === null ? $detail->toArray() : $detailResolver($detail);
+
+            if ($detailPayload === null || $detailPayload === []) {
+                continue;
+            }
+
+            $taxType = ((int) $this->attributes->value($product, 'products', 'tax', 1)) === 0 ? 0 : 1;
+            $quantity = (int) data_get($detail, $this->attributes->column('order_details', 'qty', 'qty') ?? 'qty', 0);
+            $taxableAmount = $taxType === 1
+                ? (int) round((float) data_get($detail, $taxableAmountKey, 0) * $quantity)
+                : 0;
+
+            $items[] = [
+                'detail' => $detailPayload,
+                'tax_type' => $taxType,
+                'taxable_amount' => $taxableAmount,
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
+     * @param  array<string, mixed>  $discountLine
+     * @param  array{details_relation?: string, amount_key?: string, taxable_amount_key?: string, shipping_line?: array<string, mixed>|null, shipping_amount?: mixed, force_tax_type?: int|string|null, taxable_key?: int|string, tax_free_key?: int|string}  $options
+     * @param  callable(Model): (array<string, mixed>|null)  $detailResolver
+     * @return array<int, list<array<string, mixed>>>
+     */
+    public function groupOrderDetailsByTaxBucket(
+        Model $order,
+        mixed $discountAmount,
+        array $discountLine,
+        array $options = [],
+        ?callable $detailResolver = null,
+    ): array {
+        return $this->normalizeTaxGroupKeys($this->groupDetailsByTaxBucket(
+            $this->orderDetailTaxItems($order, $detailResolver, $options),
+            $discountAmount,
+            $discountLine,
+            $options,
+        ));
     }
 
     /**
@@ -230,5 +303,15 @@ class OrderInvoiceTaxGroupService
             static fn (array $details): array => array_values($details),
             $groups,
         );
+    }
+
+    /**
+     * @param  array{details_relation?: string}  $options
+     */
+    private function detailsRelation(array $options = []): string
+    {
+        $relation = $options['details_relation'] ?? config('commerce.relationships.order_details', 'details');
+
+        return is_string($relation) && $relation !== '' ? $relation : 'details';
     }
 }
