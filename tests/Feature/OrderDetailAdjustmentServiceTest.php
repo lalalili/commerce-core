@@ -2,6 +2,22 @@
 
 use Lalalili\CommerceCore\Services\OrderDetailAdjustmentService;
 
+it('builds a reusable discount adjustment line', function (): void {
+    $service = app(OrderDetailAdjustmentService::class);
+
+    expect($service->discountAdjustmentLine())->toBe([
+        'product_id' => 'POS-1',
+        'product_title' => '折扣金額',
+        'qty' => 1,
+        'product' => ['erp_size' => 999],
+    ])->and($service->discountAdjustmentLine('product_number'))->toBe([
+        'product_number' => 'POS-1',
+        'product_title' => '折扣金額',
+        'qty' => 1,
+        'product' => ['erp_size' => 999],
+    ]);
+});
+
 it('appends a negative discount line when the order has a discount', function (): void {
     $service = app(OrderDetailAdjustmentService::class);
 

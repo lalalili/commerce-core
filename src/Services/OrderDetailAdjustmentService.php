@@ -5,6 +5,24 @@ namespace Lalalili\CommerceCore\Services;
 class OrderDetailAdjustmentService
 {
     /**
+     * @return array<string, mixed>
+     */
+    public function discountAdjustmentLine(
+        string $identifierKey = 'product_id',
+        string $identifier = 'POS-1',
+        string $title = '折扣金額',
+        int $qty = 1,
+        int $erpSize = 999,
+    ): array {
+        return [
+            $identifierKey => $identifier,
+            'product_title' => $title,
+            'qty' => $qty,
+            'product' => ['erp_size' => $erpSize],
+        ];
+    }
+
+    /**
      * @param  array<string, mixed>  $line
      * @return array<string, mixed>|null
      */
