@@ -52,6 +52,10 @@ return [
         'hooks' => [],
     ],
 
+    'checkout' => [
+        'pending_payment_types' => [],
+    ],
+
     'columns' => [
         'products' => [
             'number' => 'number',
