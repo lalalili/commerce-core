@@ -48,3 +48,36 @@ it('retries until it finds an unused number on collision', function (): void {
 
     expect((new OrderNumberGenerator)->generate())->toBe($prefix.'Q');
 });
+
+it('generates timestamp letter codes without checking order collisions', function (): void {
+    Carbon::setTestNow(Carbon::create(2026, 6, 22, 3, 14, 9, 'Asia/Taipei'));
+
+    $number = (new OrderNumberGenerator)->generateTimestampLetterCode();
+
+    expect($number)->toMatch('/^\d{6}[A-Z]{4}$/')
+        ->and(substr($number, 0, 9))->toBe(expectedOrderNumberPrefix());
+});
+
+it('generates timestamp numeric codes with a fixed width id suffix', function (): void {
+    Carbon::setTestNow(Carbon::create(2026, 6, 22, 3, 14, 9, 'Asia/Taipei'));
+
+    $number = (new OrderNumberGenerator)->generateTimestampNumericCode(1234567);
+
+    expect($number)->toMatch('/^260622031409234567\d{2}$/');
+});
+
+it('allows timestamp numeric code widths to be customized', function (): void {
+    Carbon::setTestNow(Carbon::create(2026, 6, 22, 3, 14, 9, 'Asia/Taipei'));
+
+    $number = (new OrderNumberGenerator)->generateTimestampNumericCode(42, idDigits: 4, randomDigits: 3);
+
+    expect($number)->toMatch('/^2606220314090042\d{3}$/');
+});
+
+it('rejects invalid timestamp numeric code widths', function (): void {
+    expect(fn () => (new OrderNumberGenerator)->generateTimestampNumericCode(42, idDigits: 0))
+        ->toThrow(InvalidArgumentException::class);
+
+    expect(fn () => (new OrderNumberGenerator)->generateTimestampNumericCode(42, randomDigits: 0))
+        ->toThrow(InvalidArgumentException::class);
+});
