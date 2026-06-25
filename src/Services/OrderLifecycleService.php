@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Lalalili\CommerceCore\DTOs\OrderCancellationResult;
 use Lalalili\CommerceCore\DTOs\OrderItemData;
+use Lalalili\CommerceCore\DTOs\OrderPaymentResult;
 use Lalalili\CommerceCore\Events\OrderCancelled;
 use Lalalili\CommerceCore\Events\OrderCreated;
 use Lalalili\CommerceCore\Events\OrderFinished;
@@ -115,6 +116,20 @@ class OrderLifecycleService
         CarbonInterface $paymentTime,
         int|string|null $updatedBy = null,
     ): ?Model {
+        return $this->markPaidWithResult(
+            $orderNumber,
+            $paymentStatusMessage,
+            $paymentTime,
+            $updatedBy,
+        )->order;
+    }
+
+    public function markPaidWithResult(
+        string $orderNumber,
+        string $paymentStatusMessage,
+        CarbonInterface $paymentTime,
+        int|string|null $updatedBy = null,
+    ): OrderPaymentResult {
         /** @var class-string<Order> $orderModel */
         $orderModel = config('commerce.models.order', Order::class);
 
@@ -164,7 +179,7 @@ class OrderLifecycleService
             $this->hooks->afterPaid($order);
         }
 
-        return $order;
+        return new OrderPaymentResult($order, $transitioned);
     }
 
     /**

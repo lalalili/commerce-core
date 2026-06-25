@@ -1,6 +1,7 @@
 <?php
 
 use Lalalili\CommerceCore\DTOs\OrderCancellationResult;
+use Lalalili\CommerceCore\DTOs\OrderPaymentResult;
 use Lalalili\CommerceCore\Enums\InvoiceStatus;
 use Lalalili\CommerceCore\Enums\OrderStatus;
 use Lalalili\CommerceCore\Enums\PaymentStatus;
@@ -148,6 +149,27 @@ it('dispatches paid lifecycle hooks once when marking an order paid', function (
     expect(RecordingLifecycleHook::$events)->toBe([
         ['event' => 'paid', 'order_number' => '260510HOOK'],
     ]);
+});
+
+it('reports paid transition state', function (): void {
+    $service = app(OrderLifecycleService::class);
+    $product = Product::query()->create([
+        'title' => 'Paid result course',
+        'type' => 1,
+        'list_price' => 1000,
+        'sales_price' => 1000,
+        'tax' => 1,
+    ]);
+    $order = $service->create(1, [['product_id' => $product->id]], ['number' => '260510PRES']);
+
+    $firstResult = $service->markPaidWithResult($order->number, 'Succeeded', now());
+    $secondResult = $service->markPaidWithResult($order->number, 'Succeeded again', now());
+
+    expect($firstResult)->toBeInstanceOf(OrderPaymentResult::class)
+        ->and($firstResult->order?->payment_status)->toBe(PaymentStatus::Complete)
+        ->and($firstResult->transitioned)->toBeTrue()
+        ->and($secondResult->order?->payment_status)->toBe(PaymentStatus::Complete)
+        ->and($secondResult->transitioned)->toBeFalse();
 });
 
 it('cancels paid orders as refunded and revokes entitlements', function (): void {
