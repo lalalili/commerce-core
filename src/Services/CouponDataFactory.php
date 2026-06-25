@@ -8,7 +8,11 @@ class CouponDataFactory
 
     /**
      * @param  array<string, mixed>  $attributes
-     * @param  class-string  $couponDataClass
+     *
+     * @template T of object
+     *
+     * @param  class-string<T>  $couponDataClass
+     * @return T
      */
     public function fromCoupon(
         mixed $coupon,
@@ -31,7 +35,9 @@ class CouponDataFactory
     }
 
     /**
-     * @param  class-string  $couponDataClass
+     * @template T of object
+     *
+     * @param  class-string<T>  $couponDataClass
      * @param  array{
      *     code: string,
      *     scope: int|string,
@@ -44,6 +50,7 @@ class CouponDataFactory
      *     user_id: int|null,
      *     attributes: array<string, mixed>
      * }  $payload
+     * @return T
      */
     public function fromPayload(array $payload, mixed $kind, string $couponDataClass): object
     {
