@@ -2,7 +2,7 @@
 
 Reusable product, order, invoice, payment log, and entitlement core for Laravel commerce applications.
 
-`lalalili/commerce-core` provides a configurable commerce domain layer that other packages, such as `course-commerce` and `payment-ecpay`, can integrate with without depending on a host application's concrete models.
+`lalalili/commerce-core` provides a configurable commerce domain layer that other packages, such as `course-commerce` and `commerce-payment`, can integrate with without depending on a host application's concrete models.
 
 ## Features
 
@@ -52,7 +52,7 @@ This package is designed to work with existing host schemas by mapping logical c
 
 Example host mappings:
 
-- `aitehub` keeps entitlements enabled and maps commerce product columns such as `number` to `prod_no`, with course packages depending on `commerce-core` through `course-commerce` and `payment-ecpay`.
+- `aitehub` keeps entitlements enabled and maps commerce product columns such as `number` to `prod_no`, with course packages depending on `commerce-core` through `course-commerce`, and payments reconciled through `commerce-payment`.
 - `cptw` maps legacy tables such as `order`, `order_detail`, `payment_log`, and `product`, disables `commerce.entitlements.enabled`, and keeps EPUB access grants in its host app services.
 
 Host applications should prefer overriding `config/commerce.php` instead of subclassing package models or services for schema compatibility.
