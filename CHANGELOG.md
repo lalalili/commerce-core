@@ -2,6 +2,15 @@
 
 All notable changes to `lalalili/commerce-core` are documented in this file.
 
+## [1.71.0] - 2026-07-07
+
+### Added
+
+- `CouponCartConditionPayloadBuilder` 支援免運券 kind `free_shipping`
+  (type=`shipping_coupon`、target=`subtotal`);coupon condition order 改讀
+  config `discount.ordering.coupon.*`(與 lalalili/discount 同一 single source),
+  類別常數標記 deprecated 僅作 fallback。
+
 ## [0.1.10] - 2026-06-24
 
 ### Added
