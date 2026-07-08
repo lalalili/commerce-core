@@ -79,7 +79,7 @@ class OrderInvoiceTaxGroupService
 
     /**
      * @param  callable(Model): (array<string, mixed>|null)  $detailResolver
-     * @param  array{details_relation?: string, amount_key?: string, taxable_amount_key?: string}  $options
+     * @param  array{details_relation?: string, amount_key?: string, taxable_amount_key?: string, force_tax_type?: int|string|null}  $options
      * @return list<array{detail: array<string, mixed>, tax_type: int, taxable_amount: int}>
      */
     public function orderDetailTaxItems(Model $order, ?callable $detailResolver = null, array $options = []): array
@@ -87,6 +87,7 @@ class OrderInvoiceTaxGroupService
         $detailsRelation = $this->detailsRelation($options);
         $amountKey = $options['amount_key'] ?? 'sales_price';
         $taxableAmountKey = $options['taxable_amount_key'] ?? $amountKey;
+        $forceTaxType = $options['force_tax_type'] ?? null;
 
         $order->loadMissing([$detailsRelation.'.product']);
 
@@ -97,19 +98,21 @@ class OrderInvoiceTaxGroupService
                 continue;
             }
 
-            $product = $detail->getRelationValue('product');
-
-            if (! $product instanceof Model) {
-                continue;
-            }
-
             $detailPayload = $detailResolver === null ? $detail->toArray() : $detailResolver($detail);
 
             if ($detailPayload === null || $detailPayload === []) {
                 continue;
             }
 
-            $taxType = ((int) $this->attributes->value($product, 'products', 'tax', 1)) === 0 ? 0 : 1;
+            $product = $detail->getRelationValue('product');
+
+            if (! $product instanceof Model && $forceTaxType === null) {
+                continue;
+            }
+
+            $taxType = $forceTaxType !== null
+                ? (int) $forceTaxType
+                : (((int) $this->attributes->value($product, 'products', 'tax', 1)) === 0 ? 0 : 1);
             $quantity = (int) data_get($detail, $this->attributes->column('order_details', 'qty', 'qty') ?? 'qty', 0);
             $taxableAmount = $taxType === 1
                 ? (int) round((float) data_get($detail, $taxableAmountKey, 0) * $quantity)

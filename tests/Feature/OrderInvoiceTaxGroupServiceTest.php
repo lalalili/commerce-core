@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 use Lalalili\CommerceCore\Models\Order;
 use Lalalili\CommerceCore\Models\OrderDetail;
 use Lalalili\CommerceCore\Models\Product;
@@ -236,6 +237,45 @@ it('can force order detail tax groups and append shipping from options', functio
             ['product_title' => 'Export item', 'sales_price' => 100, 'qty' => 1],
             ['product_title' => '運費金額', 'sales_price' => 50, 'qty' => 1],
             ['product_title' => '折扣金額', 'qty' => 1, 'sales_price' => -20],
+        ],
+    ]);
+});
+
+it('keeps resolved order details without a product relation when tax group is forced', function (): void {
+    $service = app(OrderInvoiceTaxGroupService::class);
+    $order = Order::query()->create([
+        'number' => 'OD10006',
+        'user_id' => 1,
+        'total_discount_amt' => 0,
+    ]);
+
+    OrderDetail::query()->create([
+        'order_id' => $order->id,
+        'order_number' => $order->number,
+        'product_id' => (string) Str::ulid(),
+        'title' => 'Gift item',
+        'qty' => 1,
+        'list_price' => 0,
+        'sales_price' => 0,
+        'status' => 0,
+    ]);
+
+    $groups = $service->groupOrderDetailsByTaxBucket(
+        $order,
+        0,
+        ['product_title' => '折扣金額', 'qty' => 1],
+        ['force_tax_type' => 2],
+        fn (Model $detail): array => [
+            'product_number' => 'GIFT001',
+            'product_title' => (string) $detail->getAttribute('title'),
+            'sales_price' => (int) $detail->getAttribute('sales_price'),
+            'qty' => (int) $detail->getAttribute('qty'),
+        ],
+    );
+
+    expect($groups)->toBe([
+        2 => [
+            ['product_number' => 'GIFT001', 'product_title' => 'Gift item', 'sales_price' => 0, 'qty' => 1],
         ],
     ]);
 });
